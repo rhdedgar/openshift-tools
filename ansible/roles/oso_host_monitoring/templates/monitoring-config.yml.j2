@@ -201,6 +201,23 @@ host_monitoring_cron:
 {# end if host master or node #}
 {% endif %}
 
+{% if osohm_host_type == 'master' and osohm_ops_sso_location|bool %}
+{# Openshift osohm_sso_reachable_check #}
+- name: check sso service functionality
+  hour: "6"
+  minute: "0"
+  job: ops-runner -f -s 120 -n sso.openshift.master.status.check /usr/bin/cron-send-sso-iam-status.py
+{# end of Openshift osohm_sso_reachable_check #}
+{% endif %}
+
+{% if osohm_host_type == 'master' and osohm_ops_sso_location|bool %}
+{# Openshift osohm_sso_liveness_check #}
+- name: check sso liveness status
+  minute: "*/5"
+  job: ops-runner -f -s 30 -n sso.openshift.master.status.check /usr/bin/cron-send-sso-liveness.py
+{# end of Openshift osohm_sso_liveness_check #}
+{% endif %}
+
 {% if osohm_host_type == 'master' and osohm_saml_auth|bool %}
 {# Openshift osohm_saml_auth check #}
 - name: check the saml pod status
