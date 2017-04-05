@@ -2,119 +2,112 @@
 - set_fact:
     oo_udp_chain:
     - chain: oo-udp
-      line:  ":oo-udp - [0:0]"
-      after: "^-A OUTPUT"
+      after: "filter$"
       regex: :oo-udp - \[0:0\]
+      block:  ":oo-udp - [0:0]"
 
     oo_udp_limit_chain:
     - chain: oo-udp-limit
-      line:  ":oo-udp-limit - [0:0]"
-      after: "^-A OUTPUT"
+      after: "filter$"
       regex: :oo-udp-limit - \[0:0\]
+      block:  ":oo-udp-limit - [0:0]"
 
     forward_udp_rules:
     - chain: FORWARD
-      line:  "-A FORWARD -o eth0 -p udp -s 172.0.0.0/8 -j ACCEPT"
       after: "^-A INPUT"
-      regex: "id_outbound_udp_rule_1_"
-
-    - chain: FORWARD
-      line:  "-A FORWARD -o eth0 -p udp -s 10.0.0.0/8 -j oo-udp"
-      after: "^-A INPUT"
-      regex: "id_outbound_udp_rule_2_"
+      regex: "id_outbound_udp_forward_1_"
+      block: |
+        -A FORWARD -o eth0 -p udp -s 172.0.0.0/8 -j ACCEPT
+        -A FORWARD -o eth0 -p udp -s 10.0.0.0/8 -j oo-udp
 
     outbound_udp_rules:
     - chain: oo-udp
+      after: "OUTPUT"
+      regex: "id_outbound_udp_rule_2_"
       block: |
-        "-A oo-udp -o eth0 -p udp --dport 53 -d 172.16.0.0/12 -j RETURN"
-        "-A oo-udp -o eth0 -p udp --dport 53 -d 204.13.250.23 -j RETURN"
-        "-A oo-udp -o eth0 -p udp --dport 53 -d 204.13.251.23 -j RETURN"
-        "-A oo-udp -o eth0 -p udp --dport 53 -d 208.78.70.23 -j RETURN"
-        "-A oo-udp -o eth0 -p udp --dport 53 -d 208.78.71.23 -j RETURN"
-        "-A oo-udp -o eth0 -p udp -s 10.0.0.0/8 -j oo-udp-limit"
-        "-A oo-udp -o eth0 -p udp --dport 123 -j RETURN"
-        "-A oo-udp -o eth0 -p udp --dport 67 -j RETURN"
-        "-A oo-udp -o eth0 -p udp --dport 161 -j RETURN"
-        "-A oo-udp -o eth0 -p udp --dport 500 -j RETURN"
-        "-A oo-udp -o eth0 -p udp --dport 1514 -j RETURN"
-        "-A oo-udp -o eth0 -p udp --dport 4500 -j RETURN"
-        "-A oo-udp -o eth0 -p udp --dport 25826 -j RETURN"
-        "-A oo-udp -o eth0 -p udp -m limit --limit 1/min --limit-burst 1 -j LOG --log-prefix \"UDP:DROPPED_ALL:\""
-        "-A oo-udp -p udp -j DROP"
-      after: ":oo-udp - [0:0]"
+        -A oo-udp -o eth0 -p udp --dport 53 -d 172.16.0.0/12 -j RETURN
+        -A oo-udp -o eth0 -p udp --dport 53 -d 204.13.250.23 -j RETURN
+        -A oo-udp -o eth0 -p udp --dport 53 -d 204.13.251.23 -j RETURN
+        -A oo-udp -o eth0 -p udp --dport 53 -d 208.78.70.23 -j RETURN
+        -A oo-udp -o eth0 -p udp --dport 53 -d 208.78.71.23 -j RETURN
+        -A oo-udp -o eth0 -p udp -s 10.0.0.0/8 -j oo-udp-limit
+        -A oo-udp -o eth0 -p udp --dport 123 -j RETURN
+        -A oo-udp -o eth0 -p udp --dport 67 -j RETURN
+        -A oo-udp -o eth0 -p udp --dport 161 -j RETURN
+        -A oo-udp -o eth0 -p udp --dport 500 -j RETURN
+        -A oo-udp -o eth0 -p udp --dport 1514 -j RETURN
+        -A oo-udp -o eth0 -p udp --dport 4500 -j RETURN
+        -A oo-udp -o eth0 -p udp --dport 25826 -j RETURN
+        -A oo-udp -o eth0 -p udp -m limit --limit 1/min --limit-burst 1 -j LOG --log-prefix \"UDP:DROPPED_ALL:\"
+        -A oo-udp -p udp -j DROP
+
+    - chain: oo-udp-limit
+      after: "OUTPUT"
       regex: "id_outbound_udp_rule_3_"
+      block: |-
+        {%- set ip_range = '' -%}
+         {%- for ip_bit3 in range(256) -%}
+          {%- for ip_bit4 in range(256) -%}
+           {%- set ip_range = "-A oo-udp-limit -s 10.0." + ip_bit3|string + "." + ip_bit4|string + " -m limit --limit 30/s -j RETURN" -%}
+           {{- ip_range }}
+          {% endfor -%}
+         {%- endfor -%}
 
     - chain: oo-udp-limit
-      block: |
-       {%- set ip_range = "" %}
-        {%- for ip_bit3 in range(0 - 256) %}
-         {%- for ip_bit4 in range(0 - 256)  %}
-          {%-  set ip_range = "-A oo-udp-limit -s 10.0." + ip_bit3 + "." + ip_bit4 + " -m limit --limit 30/s -j RETURN" %}
-          {{- ip_range -}}
-         {%- endfor %}
-        {%- endfor %}
-      after: ":oo-udp-limit - [0:0]"
+      after: "OS_FIREWALL_ALLOW"
       regex: "id_outbound_udp_rule_4_"
-
-    - chain: oo-udp-limit
       block: |
-        "-A oo-udp-limit -m limit --limit 1/min --limit-burst 1 -j LOG --log-prefix \"UDP:DROPPED_FLOOD:\""
-        "-A oo-udp-limit -j DROP"
-      after: "Ansible-managed UDP limit rules"
-      regex: "id_outbound_udp_rule_5_"
+        -A oo-udp-limit -m limit --limit 1/min --limit-burst 1 -j LOG --log-prefix \"UDP:DROPPED_FLOOD:\"
+        -A oo-udp-limit -j DROP
 
 - name: list iptables rules FORWARD chain
   command: '/usr/sbin/iptables -w -nL FORWARD'
   changed_when: False
-  register: forward_chain
+  register: forward_chain_check
 
 - name: list iptables rules udp chain
   command: '/usr/sbin/iptables -w -nL oo-udp'
   changed_when: False
-  register: udp_chain
+  register: udp_chain_check
   ignore_errors: True
 
 - name: list iptables rules udp limit chain
   command: '/usr/sbin/iptables -w -nL oo-udp-limit'
   changed_when: False
-  register: udp_limit_chain
+  register: udp_limit_chain_check
   ignore_errors: True
 
 - name: create in-memory udp chain
   command: "/usr/sbin/iptables -N oo-udp"
-  when: not "oo-udp" in udp_chain.stdout
-  with_items: "{{ udp_chain }}"
-  ignore_errors: True
-
+  when: not "oo-udp" in udp_chain_check.stdout
+  with_items: "{{ oo_udp_chain }}"
 
 - name: create in-memory udp limit chain
   command: "/usr/sbin/iptables -N oo-udp-limit"
-  when: not "oo-udp-limit" in udp_limit_chain.stdout
-  with_items: "{{ udp_limit_chain }}"
-  ignore_errors: True
-
+  when: not "oo-udp-limit" in udp_limit_chain_check.stdout
+  with_items: "{{ oo_udp_limit_chain }}"
 
 - name: modify in-memory iptables rules
-  command: "/usr/sbin/iptables {{ item.line }}"
-  when: not item.regex in forward_chain.stdout and item.regex not in udp_chain.stdout and item.regex not in udp_limit_chain.stdout
-  with_items: 
+  command: "/usr/sbin/iptables {{ item.block }}"
+  when: not item in forward_chain_check.stdout and not item in udp_chain_check.stdout and not item in udp_limit_chain_check.stdout
+  with_items:
   - "{{ forward_udp_rules }}"
   - "{{ outbound_udp_rules }}"
   ignore_errors: True
-
 
 - name: modify /etc/sysconfig/iptables
   blockinfile:
     dest: /etc/sysconfig/iptables
     insertafter: "{{ item.after }}"
-    block: "{{ item.line }}"
-    regexp: "{{ item.regex }}"
-    marker: "# {mark} Ansible-managed UDP limit rules"
+    block: "{{ item.block }}"
+#    regexp: "{{ item.regex }}"
+    marker: "# {mark} Ansible-managed {{ item.regex }} UDP limit rules"
   with_items: 
   - "{{ forward_udp_rules }}"
-  - "{{ udp_chain }}"
-  - "{{ udp_limit_chain}}"
+  - "{{ oo_udp_chain }}"
+  - "{{ oo_udp_limit_chain}}"
   - "{{ outbound_udp_rules }}"
+  ignore_errors: True
 
 - name: copy tcp_out_logging config file
   copy:
