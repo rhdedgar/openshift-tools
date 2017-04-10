@@ -1,4 +1,30 @@
 ---
+- name: Choose a master on which to run
+  set_fact:
+    cluster_master: "{{ groups['oo_hosttype_master'] | intersect(groups['oo_clusterid_' ~ oo_clusterid]) | first }}"
+  run_once: true
+
+- oc_obj:
+    state: list
+    kind: hostsubnet
+  register: hostsubnets
+  delegate_to: "{{ cluster_master }}"
+  run_once: true
+
+- set_fact:
+    kubernetes_node_name: "{{ (hostvars[inventory_hostname].ec2_private_dns_name if hostvars[inventory_hostname].oo_location == 'aws' else inventory_hostname) }}"
+
+- set_fact:
+    node_cidr: |-
+      {%- for item in hostsubnets['results']['results'][0]['items'] -%}
+       {%- if item.host == kubernetes_node_name -%}
+        {{ item.subnet }}
+       {%- endif -%}
+      {%- endfor -%}
+
+- debug:
+    msg: "{{node_cidr}} {{inventory_hostname}}"
+
 - set_fact:
     oo_udp_chain:
     - chain: oo-udp
@@ -13,6 +39,10 @@
       block:  ":oo-udp-limit - [0:0]"
 
     forward_udp_rules:
+    # allow all outbound UDP for privileged pods
+    # send all other traffic to the oo-udp chain so that rules that allow
+    # traffic can call -j RETURN instead of -j ACCEPT, and thus permit us
+    # to do later accounting
     - chain: FORWARD
       after: "^-A INPUT"
       regex: "id_outbound_udp_forward_1_"
@@ -21,6 +51,12 @@
         -A FORWARD -o eth0 -p udp -s 10.0.0.0/8 -j oo-udp
 
     outbound_udp_rules:
+    # Allow all DNS traffic to whitelisted DNS servers, with no limits.
+    # Limit any remaining permitted UDP traffic to 30 datagrams per second,
+    # and define permitted UDP traffic for un-privileged pods
+    # Finally, drop all other UDP traffic. Log dropped traffic up to once per minute.
+    # Because all dropped traffic is crammed into this single limited log rule,
+    # log entries will only be a sampling of actual dropped traffic.
     - chain: oo-udp
       after: "OUTPUT"
       regex: "id_outbound_udp_rule_2_"
@@ -38,26 +74,27 @@
         -A oo-udp -o eth0 -p udp --dport 1514 -j RETURN
         -A oo-udp -o eth0 -p udp --dport 4500 -j RETURN
         -A oo-udp -o eth0 -p udp --dport 25826 -j RETURN
-        -A oo-udp -o eth0 -p udp -m limit --limit 1/min --limit-burst 1 -j LOG --log-prefix \"UDP:DROPPED_ALL:\"
+        -A oo-udp -o eth0 -p udp -m limit --limit 1/min --limit-burst 1 -j LOG --log-prefix "UDP:DROPPED_ALL:"
         -A oo-udp -p udp -j DROP
 
+    # Generate per-user outbound UDP limits for every IP in the host subnet
     - chain: oo-udp-limit
       after: "OUTPUT"
       regex: "id_outbound_udp_rule_3_"
       block: |-
-        {%- set ip_range = '' -%}
-         {%- for ip_bit3 in range(256) -%}
-          {%- for ip_bit4 in range(256) -%}
-           {%- set ip_range = "-A oo-udp-limit -s 10.0." + ip_bit3|string + "." + ip_bit4|string + " -m limit --limit 30/s -j RETURN" -%}
-           {{- ip_range }}
-          {% endfor -%}
-         {%- endfor -%}
+         {%- for i in range(1, (node_cidr | ipaddr('size'))-1) -%}
+          -A oo-udp-limit -s {{ node_cidr | ipaddr(i) }} -m limit --limit 30/s -j RETURN
+         {% endfor -%}
 
+    # Drop all UDP traffic that exceeds the per-user limits. 
+    # Log dropped traffic up to once per minute.
+    # Because all dropped traffic is crammed into this single limited log rule,
+    # log entries will only be a sampling of actual dropped traffic.
     - chain: oo-udp-limit
       after: "OS_FIREWALL_ALLOW"
       regex: "id_outbound_udp_rule_4_"
       block: |
-        -A oo-udp-limit -m limit --limit 1/min --limit-burst 1 -j LOG --log-prefix \"UDP:DROPPED_FLOOD:\"
+        -A oo-udp-limit -m limit --limit 1/min --limit-burst 1 -j LOG --log-prefix "UDP:DROPPED_FLOOD:"
         -A oo-udp-limit -j DROP
 
 - name: list iptables rules FORWARD chain
@@ -89,25 +126,22 @@
 
 - name: modify in-memory iptables rules
   command: "/usr/sbin/iptables {{ item.block }}"
-  when: not item in forward_chain_check.stdout and not item in udp_chain_check.stdout and not item in udp_limit_chain_check.stdout
+  when: not item.block in forward_chain_check.stdout and not item.block in udp_chain_check.stdout and not item.block in udp_limit_chain_check.stdout
   with_items:
   - "{{ forward_udp_rules }}"
   - "{{ outbound_udp_rules }}"
-  ignore_errors: True
 
 - name: modify /etc/sysconfig/iptables
   blockinfile:
     dest: /etc/sysconfig/iptables
     insertafter: "{{ item.after }}"
     block: "{{ item.block }}"
-#    regexp: "{{ item.regex }}"
     marker: "# {mark} Ansible-managed {{ item.regex }} UDP limit rules"
   with_items: 
   - "{{ forward_udp_rules }}"
   - "{{ oo_udp_chain }}"
   - "{{ oo_udp_limit_chain}}"
   - "{{ outbound_udp_rules }}"
-  ignore_errors: True
 
 - name: copy tcp_out_logging config file
   copy:
