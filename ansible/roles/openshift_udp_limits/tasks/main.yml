@@ -46,7 +46,7 @@
     - chain: FORWARD
       after: "^-A INPUT"
       regex: "id_outbound_udp_forward_1_"
-      block: |
+      block: |-
         -A FORWARD -o eth0 -p udp -s 172.0.0.0/8 -j ACCEPT
         -A FORWARD -o eth0 -p udp -s 10.0.0.0/8 -j oo-udp
 
@@ -60,7 +60,7 @@
     - chain: oo-udp
       after: "OUTPUT"
       regex: "id_outbound_udp_rule_2_"
-      block: |
+      block: |-
         -A oo-udp -o eth0 -p udp --dport 53 -d 172.16.0.0/12 -j RETURN
         -A oo-udp -o eth0 -p udp --dport 53 -d 204.13.250.23 -j RETURN
         -A oo-udp -o eth0 -p udp --dport 53 -d 204.13.251.23 -j RETURN
@@ -93,7 +93,7 @@
     - chain: oo-udp-limit
       after: "OS_FIREWALL_ALLOW"
       regex: "id_outbound_udp_rule_4_"
-      block: |
+      block: |-
         -A oo-udp-limit -m limit --limit 1/min --limit-burst 1 -j LOG --log-prefix "UDP:DROPPED_FLOOD:"
         -A oo-udp-limit -j DROP
 
@@ -124,12 +124,28 @@
   when: not "oo-udp-limit" in udp_limit_chain_check.stdout
   with_items: "{{ oo_udp_limit_chain }}"
 
-- name: modify in-memory iptables rules
-  command: "/usr/sbin/iptables {{ item.block }}"
-  when: not item.block in forward_chain_check.stdout and not item.block in udp_chain_check.stdout and not item.block in udp_limit_chain_check.stdout
+- debug:
+    msg: "{{ item }}"
   with_items:
-  - "{{ forward_udp_rules }}"
-  - "{{ outbound_udp_rules }}"
+  - "{{ forward_udp_rules}}"
+#  - "{{ outbound_udp_rules }}"
+
+- name: modify in-memory forward chain
+  command: /usr/sbin/iptables "{{ item }}"
+  when: not item in forward_chain_check.stdout
+  with_items: |-
+   {%- set block_rules = forward_udp_rules|map(attribute='block')|join(',') -%}
+    {%- for line in block_rules.split(',') -%}
+     {{- line -}}
+    {% endfor %}
+
+- name: modify in-memory udp chains
+  command: /usr/sbin/iptables "{{ item }}"
+  when: not item in udp_chain_check.stdout and not item in udp_limit_chain_check.stdout
+  with_items: |-
+   {%- for line in outbound_udp_rules['item']['block'] -%}
+    {{- line -}}
+   {% endfor %}
 
 - name: modify /etc/sysconfig/iptables
   blockinfile:
