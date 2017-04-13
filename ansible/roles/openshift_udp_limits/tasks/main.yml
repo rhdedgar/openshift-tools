@@ -22,9 +22,6 @@
        {%- endif -%}
       {%- endfor -%}
 
-- debug:
-    msg: "{{node_cidr}} {{inventory_hostname}}"
-
 - set_fact:
     oo_udp_chain:
     - chain: oo-udp
@@ -44,12 +41,12 @@
     # traffic can call -j RETURN instead of -j ACCEPT, and thus permit us
     # to do later accounting
     - chain: FORWARD
-      after: "^-A INPUT"
+      after: "oo-outbound-logging"
       regex: "id_outbound_udp_forward_1_"
       line: "-A FORWARD -m comment --comment id_outbound_udp_forward_1_ -s 172.0.0.0/8 -o eth0 -p udp -j ACCEPT"
 
     - chain: FORWARD
-      after: "^-A INPUT"
+      after: "oo-outbound-logging"
       regex: "id_outbound_udp_forward_2_"
       line: "-A FORWARD -m comment --comment id_outbound_udp_forward_2_ -s 10.0.0.0/8 -o eth0 -p udp -j oo-udp"
 
@@ -61,8 +58,8 @@
     # Because all dropped traffic is crammed into this single limited log rule,
     # log entries will only be a sampling of actual dropped traffic.
     - chain: oo-udp
-      after: "OUTPUT"
-      regex: "id_outbound_udp_rule_2_"
+      after: "id_outbound_udp_forward"
+      regex: "id_outbound_udp_rule_1_"
       block: |-
         -A oo-udp -d 172.16.0.0/12 -o eth0 -p udp -m udp --dport 53 -j RETURN
         -A oo-udp -d 204.13.250.23/32 -o eth0 -p udp -m udp --dport 53 -j RETURN
@@ -80,13 +77,14 @@
         -A oo-udp -o eth0 -p udp -m limit --limit 1/min --limit-burst 1 -j LOG --log-prefix "UDP:DROPPED_ALL:"
         -A oo-udp -p udp -j DROP
 
+    outbound_udp_limit_rules:
     # Generate per-user outbound UDP limits for every IP in the host subnet
     - chain: oo-udp-limit
-      after: "OUTPUT"
-      regex: "id_outbound_udp_rule_3_"
+      after: "id_outbound_udp_rule_1_"
+      regex: "id_outbound_udp_rule_2_"
       block: |-
          {%- for i in range(1, (node_cidr | ipaddr('size'))-1) -%}
-          -A oo-udp-limit -s {{ node_cidr | ipaddr(i) }} -m limit --limit 30/s -j RETURN
+          -A oo-udp-limit -s {{ node_cidr | ipaddr(i) | ipaddr('address') }}/32 -m limit --limit 30/sec -j RETURN
          {% endfor -%}
 
     # Drop all UDP traffic that exceeds the per-user limits. 
@@ -94,65 +92,61 @@
     # Because all dropped traffic is crammed into this single limited log rule,
     # log entries will only be a sampling of actual dropped traffic.
     - chain: oo-udp-limit
-      after: "OS_FIREWALL_ALLOW"
-      regex: "id_outbound_udp_rule_4_"
+      after: "id_outbound_udp_rule_2_"
+      regex: "id_outbound_udp_rule_3_"
       block: |-
         -A oo-udp-limit -m limit --limit 1/min --limit-burst 1 -j LOG --log-prefix "UDP:DROPPED_FLOOD:"
         -A oo-udp-limit -j DROP
 
-- name: list iptables rules FORWARD chain
+- name: Create udp list
+  set_fact:
+    udp_list: |-
+     {%- set rule_groups = [] %}
+      {%- for line in outbound_udp_rules|map(attribute='block') -%}
+       {%- for item in line.splitlines() -%}
+        {%- set _ignore = rule_groups.append(item) -%}
+       {%- endfor -%}
+      {%- endfor -%}
+      {{ rule_groups }}
+
+- name: Create udp limit list
+  set_fact:
+    udp_limit_list: |-
+     {%- set rule_groups = [] %}
+      {%- for line in outbound_udp_limit_rules|map(attribute='block') -%}
+       {%- for item in line.splitlines() -%}
+        {%- set _ignore = rule_groups.append(item) -%}
+       {%- endfor -%}
+      {%- endfor -%}
+      {{ rule_groups }}
+
+- name: Create the udp limit chain
+  iptables_chain:
+    name: oo-udp-limit
+    rules:
+        - "{{ item }}"
+  with_items:
+  - "{{ udp_limit_list }}"
+
+- name: Create the udp chain
+  iptables_chain:
+    name: oo-udp
+    rules:
+        - "{{ item }}"
+  with_items:
+  - "{{ udp_list }}"
+
+- name: List iptables rules FORWARD chain
   command: '/usr/sbin/iptables -w -nL FORWARD'
   changed_when: False
   register: forward_chain_check
 
-- name: list iptables rules udp chain
-  command: '/usr/sbin/iptables -w -nL oo-udp'
-  changed_when: False
-  register: udp_chain_check
-  ignore_errors: True
-
-- name: list iptables rules udp limit chain
-  command: '/usr/sbin/iptables -w -nL oo-udp-limit'
-  changed_when: False
-  register: udp_limit_chain_check
-  ignore_errors: True
-
-- name: create in-memory udp chain
-  command: "/usr/sbin/iptables -N oo-udp"
-  when: not "oo-udp" in udp_chain_check.stdout
-  with_items: "{{ oo_udp_chain }}"
-
-- name: create in-memory udp limit chain
-  command: "/usr/sbin/iptables -N oo-udp-limit"
-  when: not "oo-udp-limit" in udp_limit_chain_check.stdout
-  with_items: "{{ oo_udp_limit_chain }}"
-
-- debug:
-    msg: "{{ item }}"
-  with_items:
-  - "{{ forward_udp_rules}}"
-
-- name: modify in-memory forward chain
+- name: Modify in-memory forward chain
   command: "/usr/sbin/iptables {{ item.line }}"
   when: not item.regex in forward_chain_check.stdout
   with_items: "{{ forward_udp_rules }}"
 
-- name: create a better list
-  set_fact:
-    broken_list: |-
-     {%- set hash_groups = [] %}
-      {%- for line in outbound_udp_rules.splitlines() -%}
-       {%- set _ignore = hash_groups.append(line) -%}
-      {%- endfor -%}
-      {{ hash_groups }}
-
-- name: modify in-memory udp chains
-  command: "/usr/sbin/iptables {{ item }}"
-  when: not item in udp_chain_check.stdout and not item in udp_limit_chain_check.stdout
-  with_items:
-  - "{{ broken_list }}"
-
-- name: modify /etc/sysconfig/iptables forward
+- name: Modify /etc/sysconfig/iptables forward
   lineinfile:
     dest: /etc/sysconfig/iptables
     insertafter: "{{ item.after }}"
@@ -161,7 +155,7 @@
   with_items:
   - "{{ forward_udp_rules }}"
 
-- name: modify /etc/sysconfig/iptables udp
+- name: Modify /etc/sysconfig/iptables udp
   blockinfile:
     dest: /etc/sysconfig/iptables
     insertafter: "{{ item.after }}"
@@ -171,8 +165,9 @@
   - "{{ oo_udp_chain }}"
   - "{{ oo_udp_limit_chain}}"
   - "{{ outbound_udp_rules }}"
+  - "{{ outbound_udp_limit_rules }}"
 
-- name: copy tcp_out_logging config file
+- name: Copy tcp_out_logging config file
   copy:
     src: iptables_udp.conf
     dest: /etc/rsyslog.d/iptables_udp.conf
@@ -181,7 +176,7 @@
     group: root
   notify: restart rsyslog
 
-- name: setup iptables UDP log rotate
+- name: Setup iptables UDP log rotate
   copy:
     content: |
       /var/log/iptables.log {
