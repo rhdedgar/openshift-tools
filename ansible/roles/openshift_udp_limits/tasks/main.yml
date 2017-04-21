@@ -84,7 +84,7 @@
       regex: "id_outbound_udp_rule_2_"
       block: |-
          {%- for i in range(1, (node_cidr | ipaddr('size'))-1) -%}
-          -A oo-udp-limit -s {{ node_cidr | ipaddr(i) | ipaddr('address') }}/32 -m limit --limit 30/sec -j RETURN
+         -A oo-udp-limit -s {{ node_cidr | ipaddr(i) | ipaddr('address') }}/32 -m limit --limit 30/sec -j RETURN
          {% endfor -%}
 
     # Drop all UDP traffic that exceeds the per-user limits. 
@@ -102,39 +102,37 @@
   set_fact:
     udp_list: |-
      {%- set rule_groups = [] %}
-      {%- for line in outbound_udp_rules|map(attribute='block') -%}
-       {%- for item in line.splitlines() -%}
-        {%- set _ignore = rule_groups.append(item) -%}
-       {%- endfor -%}
+      {%- for line in outbound_udp_rules|map(attribute='block')|join(',') -%}
+       {%- set _ignore = rule_groups.append(line) -%}
       {%- endfor -%}
-      {{ rule_groups }}
+      {{ rule_groups|join('\n') }}
 
 - name: Create udp limit list
   set_fact:
     udp_limit_list: |-
      {%- set rule_groups = [] %}
-      {%- for line in outbound_udp_limit_rules|map(attribute='block') -%}
-       {%- for item in line.splitlines() -%}
-        {%- set _ignore = rule_groups.append(item) -%}
-       {%- endfor -%}
+      {%- for line in outbound_udp_limit_rules|map(attribute='block')|join(',') -%}
+       {%- set _ignore = rule_groups.append(line) -%}
       {%- endfor -%}
-      {{ rule_groups }}
+      {{ rule_groups|join('\n') }}
+
+- debug:
+    var: udp_limit_list 
+
+- debug:
+    var: udp_limit
 
 - name: Create the udp limit chain
   iptables_chain:
     name: oo-udp-limit
     rules:
-        - "{{ item }}"
-  with_items:
-  - "{{ udp_limit_list }}"
+    - "{{ udp_limit_list }}"
 
 - name: Create the udp chain
   iptables_chain:
     name: oo-udp
     rules:
-        - "{{ item }}"
-  with_items:
-  - "{{ udp_list }}"
+    - "{{ udp_list }}"
 
 - name: List iptables rules FORWARD chain
   command: '/usr/sbin/iptables -w -nL FORWARD'
