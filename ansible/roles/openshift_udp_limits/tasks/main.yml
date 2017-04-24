@@ -98,44 +98,15 @@
         -A oo-udp-limit -m limit --limit 1/min --limit-burst 1 -j LOG --log-prefix "UDP:DROPPED_FLOOD:"
         -A oo-udp-limit -j DROP
 
-# START under construction
-- name: Create udp list
-  set_fact:
-    udp_list: |-
-     {%- set udp_rules = [] -%}
-     {%- set new_rules = outbound_udp_rules|map(attribute='block') -%}
-     {%- for rule in new_rules -%}
-      {%- set _ignore = udp_rules.append(rule.rstrip().splitlines()) %}
-     {% endfor -%}
-     {{ udp_rules }}
-
-- name: Create udp limit list
-  set_fact:
-    udp_limit_list: |-
-     {%- set udp_limit_rules = [] -%}
-     {%- set new_rules = outbound_udp_limit_rules|map(attribute='block') -%}
-     {%- for rule in new_rules -%}
-      {%- set _ignore = udp_limit_rules.append(rule.rstrip().splitlines()) %}
-     {% endfor -%}
-     {{ udp_limit_rules }}
-
-- debug:
-    msg: "{{ udp_limit_list|join(',') }}"
-
-- debug:
-    var: "{{ udp_list|join(',') }}"
-
 - name: Create the udp limit chain
   iptables_chain:
     name: oo-udp-limit
-    rules: "{{ udp_limit_list|join(',')|string }}"
+    rules: "{{ (outbound_udp_limit_rules|map(attribute='block')|join('')).splitlines() }}"
 
 - name: Create the udp chain
   iptables_chain:
     name: oo-udp
-    rules: "{{ udp_list|join(',')|string }}"
-
-# END under construction
+    rules: "{{ (outbound_udp_rules|map(attribute='block')|join('')).splitlines() }}"
 
 - name: List iptables rules FORWARD chain
   command: '/usr/sbin/iptables -w -nL FORWARD'
