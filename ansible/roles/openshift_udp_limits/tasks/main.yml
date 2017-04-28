@@ -42,13 +42,22 @@
     # to do later accounting
     - chain: FORWARD
       after: "oo-outbound-logging"
-      regex: "id_outbound_udp_forward_1_"
-      line: "-A FORWARD -m comment --comment id_outbound_udp_forward_1_ -s 172.0.0.0/8 -o eth0 -p udp -j ACCEPT"
+      regex: "id_outbound_udp_forward_2_"
+      line: "-I FORWARD -m comment --comment id_outbound_udp_forward_2_ -s {{ node_cidr }} -o eth0 -p udp -j oo-udp"
 
     - chain: FORWARD
-      after: "oo-outbound-logging"
+      after: "id_outbound_udp_forward_2_"
+      regex: "id_outbound_udp_forward_1_"
+      line: "-I FORWARD -m comment --comment id_outbound_udp_forward_1_ -s 172.0.0.0/8 -o eth0 -p udp -j ACCEPT"
+
+    forward_udp_memory_rules:
+    - chain: FORWARD
       regex: "id_outbound_udp_forward_2_"
-      line: "-A FORWARD -m comment --comment id_outbound_udp_forward_2_ -s 10.0.0.0/8 -o eth0 -p udp -j oo-udp"
+      line: "-I FORWARD -m comment --comment id_outbound_udp_forward_2_ -s {{ node_cidr }} -o eth0 -p udp -j oo-udp"
+
+    - chain: FORWARD
+      regex: "id_outbound_udp_forward_1_"
+      line: "-I FORWARD -m comment --comment id_outbound_udp_forward_1_ -s 172.0.0.0/8 -o eth0 -p udp -j ACCEPT"
 
     outbound_udp_rules:
     # Allow all DNS traffic to whitelisted DNS servers, with no limits.
@@ -116,7 +125,7 @@
 - name: Modify in-memory forward chain
   command: "/usr/sbin/iptables {{ item.line }}"
   when: not item.regex in forward_chain_check.stdout
-  with_items: "{{ forward_udp_rules }}"
+  with_items: "{{ forward_udp_memory_rules }}"
 
 - name: Modify /etc/sysconfig/iptables forward
   lineinfile:
@@ -124,8 +133,7 @@
     insertafter: "{{ item.after }}"
     line: "{{ item.line }}"
     regexp: "{{ item.regex }}"
-  with_items:
-  - "{{ forward_udp_rules }}"
+  with_items: "{{ forward_udp_rules }}"
 
 - name: Modify /etc/sysconfig/iptables udp
   blockinfile:
