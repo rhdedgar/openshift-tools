@@ -3,7 +3,7 @@
   # need this for ansible_nodename
   gather_facts: yes
   vars_files:
-  - /var/lib/clamav/playbooks/default_vars.yml
+  - /root/default_vars.yml
   vars:
 
   tasks:
