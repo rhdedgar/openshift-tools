@@ -143,8 +143,6 @@ objects:
           volumeMounts:
           - mountPath: /secrets
             name: oso-clam-scanner-secrets
-          - mountPath: /host
-            name: oso-clam-scanner-host-filesystem 
         dnsPolicy: ClusterFirst
         restartPolicy: Always
         securityContext: {}
@@ -152,10 +150,6 @@ objects:
         serviceAccountName: clamscan
         terminationGracePeriodSeconds: 30
         volumes:
-        - name: oso-clam-scanner-host-filesystem
-          hostPath:
-            path: /etc
-            type: DirectoryOrCreate
         - name: oso-clam-scanner-secrets
           secret:
             secretName: oso-clam-scanner-secrets
