@@ -32,8 +32,9 @@ RUN go get github.com/golang/glog github.com/spf13/cobra github.com/spf13/pflag 
     git clone https://github.com/golang/net.git --depth 1 && \
     cd  /go/src/github.com/openshift/clam-scanner && \
     go install && \
+    cd && \
     rm -rf /go && \
-    mkdir -p /run/clamd.scan /tmp/scan-data /host
+    mkdir -p /run/clamd.scan /tmp/scan-data
 
 # run as root user
 USER 0
