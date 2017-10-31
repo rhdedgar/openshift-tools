@@ -27,6 +27,9 @@ ENV GOBIN=/bin \
     GOPATH=/go
 
 RUN go get github.com/golang/glog github.com/spf13/cobra github.com/spf13/pflag && \
+    mkdir -p /go/src/golang.org/x/net && \
+    cd /go/src/golang.org/x/net && \
+    git clone git@github.com:golang/net.git --depth 1 && \
     cd  /go/src/github.com/openshift/clam-scanner && \
     go install && \
     rm -rf /go && \
