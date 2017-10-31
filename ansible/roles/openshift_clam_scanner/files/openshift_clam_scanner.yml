@@ -141,8 +141,8 @@ objects:
             runAsUser: 0
           terminationMessagePath: /dev/termination-log
           volumeMounts:
-          - mountPath: /secrets
-            name: oso-clam-scanner-secrets
+          - mountPath: /host/etc
+            name: oso-clam-scanner-host-filesystem
         dnsPolicy: ClusterFirst
         restartPolicy: Always
         securityContext: {}
@@ -150,9 +150,9 @@ objects:
         serviceAccountName: clamscan
         terminationGracePeriodSeconds: 30
         volumes:
-        - name: oso-clam-scanner-secrets
-          secret:
-            secretName: oso-clam-scanner-secrets
+        - name: oso-clam-scanner-host-filesystem
+          hostPath:
+            path: /host
     test: false
     triggers:
     - type: ConfigChange
