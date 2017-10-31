@@ -154,7 +154,8 @@ objects:
         volumes:
         - name: oso-clam-scanner-host-filesystem
           hostPath:
-            path: /
+            path: /etc
+            type: DirectoryOrCreate
         - name: oso-clam-scanner-secrets
           secret:
             secretName: oso-clam-scanner-secrets
