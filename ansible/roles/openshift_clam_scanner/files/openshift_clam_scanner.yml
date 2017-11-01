@@ -141,7 +141,7 @@ objects:
             runAsUser: 0
           terminationMessagePath: /dev/termination-log
           volumeMounts:
-          - mountPath: /host/etc
+          - mountPath: /host
             name: oso-clam-scanner-host-filesystem
         dnsPolicy: ClusterFirst
         restartPolicy: Always
@@ -152,7 +152,7 @@ objects:
         volumes:
         - name: oso-clam-scanner-host-filesystem
           hostPath:
-            path: /host
+            path: /
     test: false
     triggers:
     - type: ConfigChange
