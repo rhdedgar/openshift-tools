@@ -1,0 +1,64 @@
+---
+- name: Include private vars
+  include_role:
+    name: ops_roles/include_private_vars
+
+- name: "create project for {{ oii_namespace }}"
+  oadm_project:
+    name: "{{ oii_namespace }}"
+    display_name: "{{ oii_namespace }}"
+    description: ClamAV Scanning Service
+  retries: 12
+  delay: 5
+
+- name: create imageinspector serviceaccount
+  oc_serviceaccount:
+    name: imageinspector
+    namespace: image-inspector
+
+- name: add imageinspector sa to privileged SCC
+  oadm_policy_user:
+    namespace: image-inspector
+    user: system:serviceaccount:image-inspector:imageinspector
+    resource_kind: scc
+    resource_name: privileged
+
+- name: Set image inspector daemonset
+  oc_obj:
+    state: present
+    name: image-inspector
+    namespace: "{{ oii_namespace }}" 
+    kind: daemonset
+    files:
+    - "files/image-inspector.yaml"
+
+#- name: "Check to see if Clam Update pod exists in {{ oii_namespace }}"
+#  oc_obj:
+#    state: list
+#    namespace: "{{ oii_namespace }}"
+#    kind: pods
+#  register: podlist
+#
+#- set_fact:
+#    oii_pods_running: "{{ podlist.results | get_running_pods(['oso-image-inspector']) }}"
+#
+# As of now, this task basically only works for a newly-created project
+# and until oc_process switches from a delete/re-create model to a
+# replace model, don't be surprised if this task breaks things. We try 
+# to skip it by only running it if the image-inspector pods isn't running.
+#- name: "Create bc,is,dc for apps in {{ oii_namespace }} from template"
+#  oc_process:
+#    namespace: "{{ oii_namespace }}"
+#    template_name: oso-image-inspector
+#    content: "{{ lookup('file', 'files/openshift_image_inspector.yml') }}"
+#    create: True
+#    reconcile: True
+#    debug: True
+#    params:
+#      PLAT: rhel7
+#  when: '{{ oii_pods_running | length }} < 1'
+#
+#- name: "Redeploy Clam Update app in {{ oii_namespace }} when not running"
+#  command: "oc deploy --latest -n {{ oii_namespace }} oso-image-inspector"
+#  # if we just created the project, we should not try a re-deploy. Otherwise, we'll try if the pods don't seem to be running
+#  when: "{{ not createout.changed and (oii_pods_running | select('match', '^oso-image-inspector$') | list | length < 1) }}"

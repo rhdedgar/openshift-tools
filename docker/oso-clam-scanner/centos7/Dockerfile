@@ -18,6 +18,7 @@ RUN yum install -y /root/python2-clamd-1.0.2-4.el7.noarch.rpm
 # Install golang and the in-memory scanner
 RUN yum install -y golang \
                    git \
+		   python-requests \
                    openshift-tools-scripts-scanpod && \
     yum clean all
 
