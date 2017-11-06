@@ -152,3 +152,7 @@ spec:
       - name: oso-image-inspector-host-filesystem
         hostPath:
           path: /
+parameters:
+- description: Platform name
+  name: PLAT
+  value: rhel7
