@@ -30,7 +30,7 @@
     namespace: "{{ oii_namespace }}" 
     kind: daemonset
     files:
-    - "files/image-inspector.yaml"
+    - "files/image-inspector.yml"
 
 #- name: "Check to see if Clam Update pod exists in {{ oii_namespace }}"
 #  oc_obj:
