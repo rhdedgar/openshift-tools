@@ -1,4 +1,9 @@
 ---
+- name: Choose a master on which to run
+  set_fact:
+    cluster_master: "{{ groups['oo_hosttype_master'] | intersect(groups['oo_clusterid_' ~ oo_clusterid]) | first }}"
+  run_once: true
+
 - name: Include private vars
   include_role:
     name: ops_roles/include_private_vars
