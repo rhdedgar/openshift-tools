@@ -49,6 +49,11 @@
     kind: templates
   register: templatelist
 
+- debug:
+    msg: "{{ item }}"
+  with_items:
+  - "{{ templatelist }}"
+
 - name: Set image inspector daemonset
   oc_obj:
     kind: daemonset
