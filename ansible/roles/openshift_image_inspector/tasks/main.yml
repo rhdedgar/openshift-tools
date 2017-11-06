@@ -3,6 +3,14 @@
   include_role:
     name: ops_roles/include_private_vars
 
+- name: Create temp directory for doing work in
+  command: mktemp -d /tmp/openshift-logging-ansible-XXXXXX
+  register: mktemp
+  changed_when: False
+
+- set_fact:
+    tempdir: "{{ mktemp.stdout }}"
+
 - name: "create project for {{ oii_namespace }}"
   oadm_project:
     name: "{{ oii_namespace }}"
@@ -29,15 +37,26 @@
     - r_kind: scc
       r_name: privileged
 
+- copy:
+    src: image-inspector.yml
+    dest: "{{ tempdir }}/image-inspector.yml"
+
 - name: Set image inspector daemonset
   oc_obj:
-    state: present
+    kind: daemonset
     name: image-inspector
     namespace: "{{ oii_namespace }}" 
-    kind: daemonset
-    files: files/image-inspector.yml
+    state: present
+    files: "{{ tempdir }}/image-inspector.yml"
     debug: true
+    delete_after: true
 #    content: "{{ lookup('file', 'files/image-inspector.yml') }}"
+
+- name: Delete temp directory
+  file:
+    name: "{{ tempdir }}"
+    state: absent
+  changed_when: False
 
 #- name: "Check to see if Clam Update pod exists in {{ oii_namespace }}"
 #  oc_obj:
