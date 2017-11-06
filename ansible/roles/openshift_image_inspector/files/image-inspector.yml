@@ -118,6 +118,7 @@ objects:
 spec:
   selector:
     matchLabels:
+      image-inspector-host: "true"
       provider: openshift
   metadata:
     creationTimestamp: null
