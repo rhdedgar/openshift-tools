@@ -129,6 +129,8 @@ spec:
     spec:
       containers:
       - env:
+        - name: OO_PAUSE_ON_START
+          value: "false"
         image: "oso-image-inspector/oso-${PLAT}-image-inspector:latest"
         imagePullPolicy: Always
         name: oso-image-inspector 
@@ -152,6 +154,17 @@ spec:
       - name: oso-image-inspector-host-filesystem
         hostPath:
           path: /
+  test: false
+  triggers:
+  - type: ConfigChange
+  - imageChangeParams:
+      automatic: true
+      containerNames:
+      - oso-image-inspector
+      from:
+        kind: ImageStreamTag
+        name: "oso-${PLAT}-image-inspector:latest"
+    type: ImageChange
 parameters:
 - description: Platform name
   name: PLAT
