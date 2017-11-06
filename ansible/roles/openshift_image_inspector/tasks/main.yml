@@ -57,8 +57,9 @@
     state: present
     files: "{{ tempdir }}/image-inspector.yml"
     debug: true
+    force: true
     delete_after: true
-  when: "oso-image-inspector" in templatelist.results
+  when: '"oso-image-inspector" in templatelist.results'
 
 - name: Delete temp directory
   file:
