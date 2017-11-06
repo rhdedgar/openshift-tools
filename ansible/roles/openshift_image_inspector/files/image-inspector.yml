@@ -1,6 +1,6 @@
 ---
 apiVersion: v1 
-kind: DaemonSet
+kind: Template
 metadata:
   creationTimestamp: null
   generation: 1
@@ -115,17 +115,18 @@ objects:
         name: "library/oso-${PLAT}-image-inspector:latest"
       importPolicy: {}
       name: latest
-spec:
+- apiVersion: extensions/v1beta1
+  kind: DaemonSet
   selector:
     matchLabels:
       provider: openshift
-  template:
-    metadata:
-      creationTimestamp: null
-      labels:
-        image-inspector-host: "true"
-        provider: openshift
-      name: oso-image-inspector
+  metadata:
+    creationTimestamp: null
+    labels:
+      image-inspector-host: "true"
+      provider: openshift
+      template: oso-image-inspector
+    name: oso-image-inspector
     spec:
       containers:
       - env:
