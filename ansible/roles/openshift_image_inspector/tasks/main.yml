@@ -64,6 +64,7 @@
     debug: true
     force: true
     delete_after: true
+  when: templatelist.results|len < 1
 #  when: '"oso-image-inspector" in templatelist.results'
 
 - name: Delete temp directory
