@@ -50,7 +50,7 @@
   register: templatelist
 
 - debug:
-    msg: "{{ item }}"
+    msg: "{{ item['results']['results'][0]['kind'] }}"
   with_items:
   - "{{ templatelist }}"
 
@@ -64,7 +64,7 @@
     debug: true
     force: true
     delete_after: true
-  when: templatelist.results|len < 1
+  when:  templatelist['results']['results'][0]['items'] | length < 1
 #  when: '"oso-image-inspector" in templatelist.results'
 
 - name: Delete temp directory
