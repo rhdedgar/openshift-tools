@@ -1,5 +1,5 @@
 ---
-apiVersion: extensions/v1beta1 
+apiVersion: v1 
 kind: DaemonSet
 metadata:
   creationTimestamp: null
@@ -165,6 +165,9 @@ spec:
         kind: ImageStreamTag
         name: "oso-${PLAT}-image-inspector:latest"
     type: ImageChange
+    strategy:
+      resources: {}
+      type: Rolling
 parameters:
 - description: Platform name
   name: PLAT
