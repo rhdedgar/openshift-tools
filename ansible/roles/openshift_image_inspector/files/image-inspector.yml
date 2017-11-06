@@ -122,11 +122,13 @@ objects:
       provider: openshift
   metadata:
     creationTimestamp: null
+    name: oso-image-inspector
     labels:
       image-inspector-host: "true"
       provider: openshift
       template: oso-image-inspector
-    name: oso-image-inspector
+  spec:
+    replicas: 1
     spec:
       containers:
       - env:
