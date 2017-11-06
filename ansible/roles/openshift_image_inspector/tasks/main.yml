@@ -35,7 +35,10 @@
     name: image-inspector
     namespace: "{{ oii_namespace }}" 
     kind: daemonset
-    content: "{{ lookup('file', 'files/image-inspector.yml') }}"
+    files: files/image-inspector.yml
+    debug: true
+#    content: "{{ lookup('file', 'files/image-inspector.yml') }}"
+
 #- name: "Check to see if Clam Update pod exists in {{ oii_namespace }}"
 #  oc_obj:
 #    state: list
