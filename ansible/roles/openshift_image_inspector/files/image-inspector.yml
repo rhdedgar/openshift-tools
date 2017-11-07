@@ -119,14 +119,12 @@ objects:
 spec:
   selector:
     matchLabels:
-      image-inspector-host: "true"
-      provider: openshift
+      name: oso-image-inspector
   metadata:
     creationTimestamp: null
     name: oso-image-inspector
     labels:
-      image-inspector-host: "true"
-      provider: openshift
+      name: oso-image-inspector
   spec:
     replicas: 1
     spec:
