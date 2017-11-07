@@ -54,9 +54,9 @@
   with_items:
   - "{{ templatelist }}"
 
-- name: Set image inspector daemonset
+- name: Set image inspector template
   oc_obj:
-    kind: daemonset
+    kind: template
     name: image-inspector
     namespace: "{{ oii_namespace }}" 
     state: present
@@ -65,33 +65,16 @@
     force: true
     delete_after: true
   when:  templatelist['results']['results'][0]['items'] | length < 1
-#  when: '"oso-image-inspector" in templatelist.results'
+
+- name: Deploy image inspector pods
+  oc_process:
+    namespace: "{{ oii_namespace }}"
+    template_name: "oso-image-inspector"
+    create: True
+    params:
+      PLAT: "rhel7"
 
 - name: Delete temp directory
   file:
     name: "{{ tempdir }}"
     state: absent
-
-#- set_fact:
-#    oii_templates_exist: "{{ templatelist.results | get_running_pods(['oso-image-inspector']) }}"
-#
-# As of now, this task basically only works for a newly-created project
-# and until oc_process switches from a delete/re-create model to a
-# replace model, don't be surprised if this task breaks things. We try 
-# to skip it by only running it if the image-inspector pods isn't running.
-#- name: "Create bc,is,dc for apps in {{ oii_namespace }} from template"
-#  oc_process:
-#    namespace: "{{ oii_namespace }}"
-#    template_name: oso-image-inspector
-#    content: "{{ lookup('file', 'files/openshift_image_inspector.yml') }}"
-#    create: True
-#    reconcile: True
-#    debug: True
-#    params:
-#      PLAT: rhel7
-#  when: '{{ oii_pods_running | length }} < 1'
-#
-#- name: "Redeploy Clam Update app in {{ oii_namespace }} when not running"
-#  command: "oc deploy --latest -n {{ oii_namespace }} oso-image-inspector"
-#  # if we just created the project, we should not try a re-deploy. Otherwise, we'll try if the pods don't seem to be running
-#  when: "{{ not createout.changed and (oii_pods_running | select('match', '^oso-image-inspector$') | list | length < 1) }}"
