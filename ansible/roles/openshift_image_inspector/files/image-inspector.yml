@@ -118,6 +118,10 @@ objects:
       name: latest
 - apiVersion: extensions/v1beta1
   kind: DaemonSet
+  metadata:
+    labels:
+      template: oso-image-inspector
+    name: oso-image-inspector
   selector:
     matchLabels:
       name: oso-image-inspector
