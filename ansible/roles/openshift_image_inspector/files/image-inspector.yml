@@ -122,6 +122,9 @@ objects:
     matchLabels:
       name: oso-image-inspector
   spec:
+    strategy:
+      resources: {}
+      type: Rolling
     template:
       metadata:
         creationTimestamp: null
@@ -166,10 +169,7 @@ objects:
         from:
           kind: ImageStreamTag
           name: "oso-${PLAT}-image-inspector:latest"
-    type: ImageChange
-    strategy:
-      resources: {}
-      type: Rolling
+      type: ImageChange
 parameters:
 - description: Platform name
   name: PLAT
