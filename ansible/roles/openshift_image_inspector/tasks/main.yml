@@ -54,25 +54,49 @@
   with_items:
   - "{{ templatelist }}"
 
-- name: Set image inspector template
-  oc_obj:
-    kind: template
-    name: image-inspector
-    namespace: "{{ oii_namespace }}" 
-    state: present
-    files: "{{ tempdir }}/image-inspector.yml"
-    debug: true
-    force: true
-    delete_after: true
-  when:  templatelist['results']['results'][0]['items'] | length < 1
+#- name: Set image inspector template
+#  oc_obj:
+#    kind: template
+#    name: image-inspector
+#    namespace: "{{ oii_namespace }}" 
+#    state: present
+#    files: "{{ tempdir }}/image-inspector.yml"
+#    debug: true
+#    force: true
+#    delete_after: true
+#  when:  templatelist['results']['results'][0]['items'] | length < 1
 
-- name: Deploy image inspector pods
+- name: "Create bc,is,ds for apps in {{ oii_namespace }} from template"
   oc_process:
     namespace: "{{ oii_namespace }}"
-    template_name: "oso-image-inspector"
+    template_name: oso-image-inspector
+    content: "{{ lookup('file', 'files/image-inspector.yml') }}"
     create: True
+    debug: True
     params:
-      PLAT: "rhel7"
+      PLAT: rhel7
+  register: processout
+  run_once: true
+
+- debug: var=processout
+
+#
+#- name: Create base bc 
+#  oc_obj:
+#    state: present
+#    kind: bc
+#    name: "oso-rhel7-ops-base"
+#    files:
+#    - "{{ tempdir }}/image-inspector.yml"
+#
+#- name: Deploy image inspector pods
+#  oc_process:
+#    namespace: "{{ oii_namespace }}"
+#    template_name: "oso-image-inspector"
+#    create: True
+#    debug: True
+#    params:
+#      PLAT: "rhel7"
 
 - name: Delete temp directory
   file:
