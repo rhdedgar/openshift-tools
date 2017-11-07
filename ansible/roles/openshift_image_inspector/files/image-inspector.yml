@@ -156,16 +156,16 @@ objects:
         - name: oso-image-inspector-host-filesystem
           hostPath:
             path: /
-  test: false
-  triggers:
-  - type: ConfigChange
-  - imageChangeParams:
-      automatic: true
-      containerNames:
-      - oso-image-inspector
-      from:
-        kind: ImageStreamTag
-        name: "oso-${PLAT}-image-inspector:latest"
+    test: false
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - oso-image-inspector
+        from:
+          kind: ImageStreamTag
+          name: "oso-${PLAT}-image-inspector:latest"
     type: ImageChange
     strategy:
       resources: {}
