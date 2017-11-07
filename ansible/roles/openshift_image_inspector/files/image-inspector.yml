@@ -1,6 +1,6 @@
 ---
-apiVersion: extensions/v1beta1 
-kind: DaemonSet
+apiVersion: v1 
+kind: Template
 metadata:
   creationTimestamp: null
   generation: 1
@@ -116,7 +116,8 @@ objects:
         name: "library/oso-${PLAT}-image-inspector:latest"
       importPolicy: {}
       name: latest
-spec:
+- apiVersion: extensions/v1beta1
+  kind: DaemonSet
   selector:
     matchLabels:
       name: oso-image-inspector
