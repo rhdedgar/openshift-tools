@@ -54,17 +54,17 @@
   with_items:
   - "{{ templatelist }}"
 
-#- name: Set image inspector template
-#  oc_obj:
-#    kind: template
-#    name: image-inspector
-#    namespace: "{{ oii_namespace }}" 
-#    state: present
-#    files: "{{ tempdir }}/image-inspector.yml"
-#    debug: true
-#    force: true
-#    delete_after: true
-#  when:  templatelist['results']['results'][0]['items'] | length < 1
+- name: Set image inspector template
+  oc_obj:
+    kind: template
+    name: image-inspector
+    namespace: "{{ oii_namespace }}" 
+    state: present
+    files: "{{ tempdir }}/image-inspector.yml"
+    debug: true
+    force: true
+    delete_after: true
+  when:  templatelist['results']['results'][0]['items'] | length < 1
 
 - name: "Create bc,is,ds for apps in {{ oii_namespace }} from template"
   oc_process:
