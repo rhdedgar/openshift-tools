@@ -120,11 +120,12 @@ spec:
   selector:
     matchLabels:
       name: oso-image-inspector
-  metadata:
-    creationTimestamp: null
-    name: oso-image-inspector
-    labels:
+  template:
+    metadata:
+      creationTimestamp: null
       name: oso-image-inspector
+      labels:
+        name: oso-image-inspector
   spec:
     replicas: 1
     spec:
