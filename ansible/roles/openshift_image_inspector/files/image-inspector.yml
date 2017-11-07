@@ -126,7 +126,6 @@ spec:
       name: oso-image-inspector
       labels:
         name: oso-image-inspector
-  spec:
     replicas: 1
     spec:
       containers:
