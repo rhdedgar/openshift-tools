@@ -58,17 +58,21 @@ class ClamLogSrv(object):
                     newdata = data.split('\n')[6]
                     rec_js = json.loads(newdata)
 
-                    filemode = ''
+                    if 'results' not in newdata:
+                        break
 
-                    if os.path.isfile(logfile):
-                        filemode = 'a'
                     else:
-                        filemode = 'w'
+                        filemode = ''
 
-                    with open(logfile, filemode) as open_file:
-                        open_file.write(json.dumps(rec_js, indent=4, sort_keys=True))
+                        if os.path.isfile(logfile):
+                            filemode = 'a'
+                        else:
+                            filemode = 'w'
 
-                    break
+                        with open(logfile, filemode) as open_file:
+                            open_file.write(json.dumps(rec_js, indent=4, sort_keys=True))
+
+                        break
 
             finally:
                 connection.close()
