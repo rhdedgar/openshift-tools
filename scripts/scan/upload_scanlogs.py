@@ -94,10 +94,13 @@ class ClamLogUpload(object):
 
             for report_file in file_list:
                 full_path = (os.path.join('/var/log/clam/', report_file))
-                report_data = open(full_path, 'rb')
-                upload_path = cluster_name + '/' + cur_time +\
-                              '/' + node_hostname + '/' + report_file
-                s3_bucket.put_object(Key=upload_path, Body=report_data)
+                if os.path.isfile(full_path):
+                    report_data = open(full_path, 'rb')
+                    upload_path = cluster_name + '/' + cur_time +\
+                                  '/' + node_hostname + '/' + report_file
+                    s3_bucket.put_object(Key=upload_path, Body=report_data)
+
+                    os.remove(full_path)
 
         else:
             raise ValueError(bucket + ' does not exist.')
