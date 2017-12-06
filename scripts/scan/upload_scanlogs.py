@@ -100,7 +100,7 @@ class ClamLogUpload(object):
                                   '/' + node_hostname + '/' + report_file
                     s3_bucket.put_object(Key=upload_path, Body=report_data)
 
-                    os.remove(full_path)
+                    os.replace(full_path, full_path + '.last')
 
         else:
             raise ValueError(bucket + ' does not exist.')
