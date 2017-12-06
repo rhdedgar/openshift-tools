@@ -27,12 +27,12 @@
 - name: create imageinspector serviceaccount
   oc_serviceaccount:
     name: imageinspector
-    namespace: image-inspector
+    namespace: "{{ oii_namespace }}" 
 
 - name: set service account permissions
   oadm_policy_user:
-    namespace: image-inspector
-    user: system:serviceaccount:image-inspector:imageinspector
+    namespace: "{{ oii_namespace }}"
+    user: "system:serviceaccount:{{ oii_namespace }}:imageinspector"
     resource_kind: "{{ item.r_kind }}" 
     resource_name: "{{ item.r_name }}"
     state: present
