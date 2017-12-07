@@ -54,7 +54,7 @@ class ClamLogSrv(object):
 
             try:
                 while True:
-                    data = connection.recv(1024)
+                    data = connection.recv(10240)
                     newdata = data.split('\n')[6]
                     rec_js = json.loads(newdata)
 

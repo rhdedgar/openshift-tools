@@ -90,7 +90,7 @@ class ClamLogUpload(object):
             s3_client = boto3.resource('s3')
             s3_bucket = s3_client.Bucket(bucket)
 
-            cur_time = datetime.now().strftime('%Y%m%d-%H%M%S')
+            cur_time = datetime.now().strftime('%Y%m%d')
 
             for report_file in file_list:
                 full_path = (os.path.join('/var/log/clam/', report_file))
