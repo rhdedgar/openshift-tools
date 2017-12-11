@@ -6,7 +6,7 @@ metadata:
   generation: 1
   labels:
     provider: openshift
-    image-inspector-host: true
+    image-inspector-host: "true"
   name: oso-image-inspector 
 objects:
 - apiVersion: v1
@@ -155,7 +155,7 @@ objects:
             name: oso-image-inspector-secrets
         dnsPolicy: ClusterFirst
         nodeSelector:
-          image-inspector-enabled: true
+          image-inspector-enabled: "True"
         restartPolicy: Always
         securityContext: {}
         serviceAccount: imageinspector
