@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import socket
+import subprocess
 import sys
 
 
@@ -70,6 +71,18 @@ class ClamLogSrv(object):
                             filemode = 'w'
 
                         with open(logfile, filemode) as open_file:
+                            container_id = rec_js['containerID']
+                            container_ns = subprocess.check_output([\
+                            'chroot', \
+                            '/host', \
+                            '/usr/bin/docker', \
+                            'inspect', \
+                            '--format', \
+                            '\'{{index .Config.Labels "io.kubernetes.pod.namespace"}}\'', \
+                            container_id
+                                                                   ])
+
+                            rec_js['namespace'] = container_ns.strip()
                             open_file.write(json.dumps(rec_js, indent=4, sort_keys=True))
 
                         break
