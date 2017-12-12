@@ -64,6 +64,7 @@ class ClamLogSrv(object):
 
                     else:
                         filemode = ''
+                        container_id = rec_js['containerID']
 
                         if os.path.isfile(logfile):
                             filemode = 'a'
@@ -71,20 +72,38 @@ class ClamLogSrv(object):
                             filemode = 'w'
 
                         with open(logfile, filemode) as open_file:
-                            container_id = rec_js['containerID']
                             container_ns = subprocess.check_output([\
                             'chroot', \
                             '/host', \
                             '/usr/bin/docker', \
                             'inspect', \
                             '--format', \
-                            '\'{{index .Config.Labels "io.kubernetes.pod.namespace"}}\'', \
+                            '\'{{index .Config.Labels "io.kubernetes.pod.namespace"}} \
+                            {{index .Config.Labels "io.kubernetes.pod.name"}}\'', \
                             container_id
                                                                    ])
 
-                            rec_js['namespace'] = container_ns.strip()
+                            rec_js['nameSpace'] = container_ns.split()[0]
+                            rec_js['podName'] = container_ns.split()[1]
                             open_file.write(json.dumps(rec_js, indent=4, sort_keys=True))
 
+                        inspectlog = logfile + 'inspect_output.log'
+
+                        if os.path.isfile(inspectlog):
+                            filemode = 'a'
+                        else:
+                            filemode = 'w'
+
+                        with open(inspectlog, filemode) as open_file:
+                            open_file.write(
+                                subprocess.check_output([\
+                                'chroot', \
+                                '/host', \
+                                '/usr/bin/docker', \
+                                'inspect', \
+                                container_id
+                                                        ])
+                            )
                         break
 
             finally:
