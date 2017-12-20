@@ -37,6 +37,7 @@ objects:
         from:
           kind: ImageStreamTag
           name: "${PLAT}:latest"
+        noCache: true
       type: Docker
     triggers:
     - imageChange: {}
