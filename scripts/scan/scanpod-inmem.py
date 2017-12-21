@@ -51,7 +51,7 @@ def scanpid(pid, scancache, clam):
     '''Scan the executable bits of the process corresponding to pid.'''
     retval = {}
     try:
-        with open('/proc/{pid}/maps'.format(pid=pid), 'r') as maps:
+        with open('/host/proc/{pid}/maps'.format(pid=pid), 'r') as maps:
             # iterate over all executable memory-mapped files (generally binaries and libraries)
             for line in maps:
                 match = re.search(r'^(?P<name>[^ ]*) [r-][w-]x[ps-]', line)
@@ -85,8 +85,15 @@ def scanpid(pid, scancache, clam):
                     except OSError:
                         # no worries if we tried to open it and failed. The process has probably gone away
                         pass
-    except (OSError, IOError):
+
+    except OSError as err:
+	print("OS error: {0}".format(err))
         pass
+
+    except IOError as err:
+	print("IO error: {0}".format(err))
+        pass
+
     return retval
 
 def scanall(mntns, namespace, podname, container, scancache):
