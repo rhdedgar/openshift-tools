@@ -16,6 +16,7 @@ ADD root/ /root/
 # Local install of python2-clamd, which is a prerequisite for scanpod-inmem
 # Then install golang and the in-memory scanner
 RUN yum install -y python2-boto3 \
+                   systemd-python \
 		   /root/python2-clamd-1.0.2-4.el7.noarch.rpm \
                    golang \
                    git \
