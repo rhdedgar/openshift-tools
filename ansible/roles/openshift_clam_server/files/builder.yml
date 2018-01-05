@@ -25,7 +25,7 @@ objects:
     source:
       contextDir: "docker/oso-ops-base/${PLAT}"
       git:
-        ref: oso-clam-server
+        ref: oso-image-inspector 
         uri: https://github.com/rhdedgar/openshift-tools
       secrets: []
       type: Git
@@ -58,7 +58,7 @@ objects:
     source:
       contextDir: "docker/oso-clam-server/${PLAT}"
       git:
-        ref: oso-clam-server
+        ref: oso-image-inspector 
         uri: https://github.com/rhdedgar/openshift-tools
       secrets: []
       type: Git
