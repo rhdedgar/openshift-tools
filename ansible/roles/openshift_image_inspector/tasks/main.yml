@@ -13,7 +13,7 @@
     tempdir: "{{ mktemp.stdout }}"
 
 - name: "create project for {{ oii_namespace }}"
-  oadm_project:
+  oc_project:
     name: "{{ oii_namespace }}"
     display_name: "{{ oii_namespace }}"
     description: ClamAV Scanning Service
@@ -81,7 +81,7 @@
   when:  templatelist['results']['results'][0]['items'] | length < 1
 
 - name: Get the address of the registry
-  shell: "oc get services -n default | grep docker-registry | awk '{print $2}'"
+  shell: "oc get service -n default docker-registry --template={% raw %}'{{.spec.clusterIP}}:{{(index .spec.ports 0).port}}'{% endraw %}"
   register: registry_ip
   run_once: true
   when: registry_ip is not defined
@@ -93,6 +93,10 @@
     kind: pods
   register: podlist
 
+- name: ededgar testing
+  debug:
+    msg: "{{ registry_ip['stdout'] }} }}"
+
 - name: "Create bc,is,ds for apps in {{ oii_namespace }} from template"
   oc_process:
     namespace: "{{ oii_namespace }}"
@@ -101,7 +105,7 @@
     create: True
     params:
       PLAT: rhel7
-      NAMESPACE: "{{ registry_ip['stdout'] | quote }}:5000/{{ oii_namespace }}"
+      NAMESPACE: "{{ registry_ip['stdout'] }}/{{ oii_namespace }}"
   when: podlist['results']['results'][0]['items'] | length < 1
   delegate_to: "{{ cluster_master }}"
   run_once: true

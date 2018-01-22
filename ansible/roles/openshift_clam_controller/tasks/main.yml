@@ -1,0 +1,136 @@
+---
+- name: Create temp directory to store the template
+  command: mktemp -d /tmp/openshift-clam-controller-ansible-XXXXXX
+  register: mktemp
+  changed_when: False
+
+- name: Choose a master on which to run
+  set_fact:
+    cluster_master: "{{ groups['oo_hosttype_master'] | intersect(groups['oo_clusterid_' ~ oo_clusterid]) | first }}"
+  run_once: true
+
+- set_fact:
+    tempdir: "{{ mktemp.stdout }}"
+
+- name: "create project for {{ occ_namespace }}"
+  oadm_project:
+    name: "{{ occ_namespace }}"
+    display_name: "{{ occ_namespace }}"
+    description: ClamAV Controller Service
+    node_selector: "clam-controller-enabled=True"
+  retries: 12
+  delay: 5
+
+- name: "join with image-inspector project network"
+  command: "oc adm pod-network join-projects {{ occ_namespace }} openshift-image-inspector"
+  delegate_to: "{{ cluster_master }}"
+  run_once: true
+  ignore_errors: true
+
+- name: create clamcontroller serviceaccount
+  oc_serviceaccount:
+    name: clamcontroller
+    namespace: "{{ occ_namespace }}" 
+
+- name: "annotate {{ occ_namespace }} project"
+  command: "oc annotate ns {{ occ_namespace }} openshift.io/nodeselector=clam-server-enabled=True"
+  delegate_to: "{{ cluster_master }}"
+  run_once: true
+  ignore_errors: true
+
+- name: set service account permissions
+  command: "oc adm policy {{ item.r_kind }} {{ item.r_name }} system:serviceaccount:{{ occ_namespace }}:clamserver"
+  delegate_to: "{{ cluster_master }}"
+  run_once: true
+  ignore_errors: true
+  with_items:
+  - r_kind: add-cluster-role-to-user
+    r_name: cluster-reader
+  - r_kind: add-scc-to-user
+    r_name: privileged
+
+  # running as command until oc_secret supports config file image secrets
+- name: "Create image pull secret"
+  command: "oc secrets new dockercfgjson .dockerconfigjson=/var/lib/origin/.docker/config.json -n {{ occ_namespace }}"
+  delegate_to: "{{ cluster_master }}"
+  run_once: true
+  ignore_errors: true
+
+- name: "Create clam controller secrets for {{ occ_namespace }}"
+  oc_secret:
+    namespace: "{{ occ_namespace }}"
+    name: oso-clam-controller-secrets
+    contents:
+    - path: takedown_sigs.yml
+      data: "{{ occ_takedown_sigs_content }}"
+    - path: aws_config.yml
+      data: "{{ occ_aws_config_content }}"
+    - path: aws_creds.yml
+      data: "{{ occ_aws_creds_content }}"
+
+- name: "Check to see if template already exists in {{ occ_namespace }}"
+  oc_obj:
+    state: list
+    namespace: "{{ occ_namespace }}"
+    kind: templates
+  register: templatelist
+
+- name: copy clam controller template
+  copy:
+    src: clam-controller.yml
+    dest: "{{ tempdir }}/clam-controller.yml"
+  when:  templatelist['results']['results'][0]['items'] | length < 1
+
+- name: Set clam controller template
+  oc_obj:
+    kind: template
+    name: clam-controller
+    namespace: "{{ occ_namespace }}" 
+    state: present
+    files: "{{ tempdir }}/clam-controller.yml"
+    debug: true
+    force: true
+    delete_after: true
+  when:  templatelist['results']['results'][0]['items'] | length < 1
+
+- name: Get the address of the registry
+  shell: "oc get service -n default docker-registry --template={% raw %}'{{.spec.clusterIP}}:{{(index .spec.ports 0).port}}'{% endraw %}"
+  register: registry_ip
+  run_once: true
+  when: registry_ip is not defined
+
+- name: "Check to see if clam-controller pods exist in {{ occ_namespace }}"
+  oc_obj:
+    state: list
+    namespace: "{{ occ_namespace }}"
+    kind: pods
+  register: podlist
+
+- name: "Create bc,is,ds for apps in {{ occ_namespace }} from template"
+  oc_process:
+    namespace: "{{ occ_namespace }}"
+    template_name: oso-clam-controller
+    content: "{{ lookup('file', 'files/clam-controller.yml') }}"
+    create: True
+    params:
+      PLAT: rhel7
+      NAMESPACE: "{{ registry_ip['stdout'] }}/{{ occ_namespace }}"
+  when: podlist['results']['results'][0]['items'] | length < 1
+  delegate_to: "{{ cluster_master }}"
+  run_once: true
+  ignore_errors: true
+
+- name: Label compute nodes
+  oc_label:
+    selector: "{{ item }}" 
+    kind: node
+    state: add
+    labels:
+      - key: clam-controller-enabled
+        value:  true
+  with_items: "{{ occ_nodes }}"
+
+- name: Delete temp directory
+  file:
+    name: "{{ tempdir }}"
+    state: absent

@@ -12,13 +12,26 @@
 - set_fact:
     tempdir: "{{ mktemp.stdout }}"
 
+- name: Get the address of the registry
+  shell: "oc get service -n default docker-registry --template={% raw %}'{{.spec.clusterIP}}:{{(index .spec.ports 0).port}}'{% endraw %}"
+  register: registry_ip
+  run_once: true
+  when: registry_ip is not defined
+
 - name: "create project for {{ ocs_namespace }}"
-  oadm_project:
+  oc_project:
     name: "{{ ocs_namespace }}"
     display_name: "{{ ocs_namespace }}"
     description: ClamAV Server
+    node_selector: "clam-server-enabled=True"
   retries: 12
   delay: 5
+
+- name: "annotate {{ ocs_namespace }} project"
+  command: "oc annotate ns {{ ocs_namespace }} openshift.io/nodeselector=clam-server-enabled=True"
+  delegate_to: "{{ cluster_master }}"
+  run_once: true
+  ignore_errors: true
 
 - name: create clamserver serviceaccount
   oc_serviceaccount:
@@ -26,17 +39,15 @@
     namespace: "{{ ocs_namespace }}" 
 
 - name: set service account permissions
-  oadm_policy_user:
-    namespace: "{{ ocs_namespace }}"
-    user: "system:serviceaccount:{{ ocs_namespace }}:clamserver"
-    resource_kind: "{{ item.r_kind }}" 
-    resource_name: "{{ item.r_name }}"
-    state: present
+  command: "oc adm policy {{ item.r_kind }} {{ item.r_name }} system:serviceaccount:{{ ocs_namespace }}:clamserver"
+  delegate_to: "{{ cluster_master }}"
+  run_once: true
+  ignore_errors: true
   with_items:
-    - r_kind: cluster-role
-      r_name: cluster-reader
-    - r_kind: scc
-      r_name: privileged
+  - r_kind: add-cluster-role-to-user
+    r_name: cluster-reader
+  - r_kind: add-scc-to-user
+    r_name: privileged
 
   # running as command until oc_secret supports config file image secrets
 - name: "Create image pull secret"
@@ -80,18 +91,15 @@
     delete_after: true
   when:  templatelist['results']['results'][0]['items'] | length < 1
 
-- name: Get the address of the registry
-  shell: "oc get services -n default | grep docker-registry | awk '{print $2}'"
-  register: registry_ip
-  run_once: true
-  when: registry_ip is not defined
-
 - name: "Check to see if clam server pods exist in {{ ocs_namespace }}"
   oc_obj:
     state: list
     namespace: "{{ ocs_namespace }}"
     kind: pods
   register: podlist
+
+- debug:
+    msg: "{{ registry_ip['stdout'] }}/{{ ocs_namespace }}"
 
 - name: "Create bc,is,ds for apps in {{ ocs_namespace }} from template"
   oc_process:
@@ -101,13 +109,13 @@
     create: True
     params:
       PLAT: rhel7
-      NAMESPACE: "{{ registry_ip['stdout'] | quote }}:5000/{{ ocs_namespace }}"
+      NAMESPACE: "{{ registry_ip['stdout'] }}/{{ ocs_namespace }}"
   when: podlist['results']['results'][0]['items'] | length < 1
   delegate_to: "{{ cluster_master }}"
   run_once: true
   ignore_errors: true
 
-- name: Label compute nodes
+- name: Label nodes
   oc_label:
     selector: "{{ item }}" 
     kind: node

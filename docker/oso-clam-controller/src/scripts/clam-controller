@@ -1,0 +1,245 @@
+#!/bin/env python
+# vim: expandtab:tabstop=4:shiftwidth=4
+
+""" Listen for kubernetes PLEG creation events, and launch an
+    image-inspector scan for every newly created customer container. """
+
+from datetime import datetime, timedelta
+
+import json
+import os
+import socket
+import subprocess
+import re
+import yaml
+
+#from Queue import Queue
+#from threading import Thread
+
+# pylint: disable=line-too-long
+class PlegEventListener(object):
+    """ Class to receive and report scan results. """
+
+# get number of items in worker queue and launch scan if none incoming?
+#    def scan_worker(self, scan_q):
+#        """ This is the worker thread function. """
+#        while True:
+#            container = scan_q.get()
+#            self.process_container(container)
+#            scan_q.task_done()
+
+
+#    def scan_worker():
+#        """ This is the worker thread function. """
+#        print("listener, gonna send container off for scanning")
+#        # add container id and function to process it here
+#        scan_q.put(container_id)
+#        #self.process_container(container_id)
+
+
+    def gather_images(self):
+        """ Gather and filter registry images. """
+
+        reg_cmd = ['oc', \
+                   'get', \
+                   'service', \
+                   '-n', \
+                   'default', \
+                   'docker-registry', \
+                   '--template=\'{{index .spec "clusterIP"}}:{{(index .spec.ports 0).port}}\''
+                  ]
+
+        reg_add = subprocess.check_output(reg_cmd).strip('\'').strip('\"')
+
+        rh_con_reg = r'(^registry.connect.redhat.com)|'
+        rh_acc_reg = r'(^registry.access.redhat.com)|'
+        reg_aws = r'(^registry.reg-aws.openshift.com)'
+        priv_ns = r'(^' + reg_add + r'\/openshift-)'
+        heal_ns = r'(^' + reg_add + \
+        r'\/ops-health-monitoring\/)|(^docker-registry.default.svc:5000\/ops-health-monitoring\/)'
+
+        print(reg_add)
+        print(priv_ns)
+
+        img_list = subprocess.check_output(\
+        ['oc', 'get', 'images', '--no-headers=true']
+                                          ).splitlines()
+
+        for imname in img_list:
+            im_id = imname.split()[0]
+            im_add = imname.split()[1]
+            is_health = re.match(heal_ns, im_add, re.I)
+            #is_rh = re.match(r"(^registry.connect.redhat.com)|#
+            #(^registry.access.redhat.com)|(^registry.reg-aws.openshift.com)", im_add, re.I)
+            is_rh = re.match(rh_con_reg + rh_acc_reg + reg_aws, im_add, re.I)
+            is_ops = re.match(priv_ns, im_add, re.I)
+
+            if not is_health and not is_rh and not is_ops:
+                self.process_image(im_add, im_id)
+
+
+    @staticmethod
+    def process_image(im_add, im_id):
+        """ Scan the provided image. """
+
+        img_cmd = ['oc', \
+       'export', \
+       'image',
+                   im_id, \
+        '--template=\
+        \'{{with .metadata.annotations.scanned}}{{.}} {{else}}never-scanned {{end}}{{.metadata.name}}\'' \
+                  ]
+
+        img_output = subprocess.check_output(img_cmd).strip('\'').strip('\"')
+        print(img_output)
+        podstamp = img_output.split()[0]
+
+        if podstamp == 'never-scanned' or \
+        datetime.today()-timedelta(weeks=2) > \
+        datetime.strptime(podstamp, '%Y%m%d'):
+
+            curdate = datetime.now().strftime('%Y%m%d')
+
+            anno_cmd = ['oc', 'annotate', 'image', im_id, 'scanned=' + curdate, '--overwrite']
+            subprocess.run(anno_cmd)
+
+            scan_cmd = ['image-inspector', \
+                        '-scan-type=clamav', \
+                        '-clam-socket=/host/host/var/run/clamd.scan/clamd.sock', \
+                        '-image=' + im_add, \
+                        '-post-results-url=http://localhost:8080', \
+                        '--path=/tmp/image-content'
+                       ]
+            print(scan_cmd)
+            subprocess.run(scan_cmd)
+            # todo: catch errors with the image-inspector command and de-annotate if there was an issue?
+
+
+    @staticmethod
+    def annotate(namespace):
+        """ Annotate the specified user for deprovisioning. """
+
+        des_proj_cmd = ['oc', \
+                        'export', \
+                        'project', \
+                         namespace, \
+                        '--template='\
+                        '{{index .metadata.annotations "openshift.io/requester"}}\'' \
+                       ]
+
+        des_proj_out = subprocess.check_output(des_proj_cmd).strip('\'').strip('\"')
+
+        print(type(des_proj_out), des_proj_out)
+
+        user_name = ''
+        anno_cmd = ['oc', 'annotate', 'user', user_name, 'takedown=True', '--overwrite']
+        subprocess.run(anno_cmd)
+
+
+    @staticmethod
+    def load_sigs():
+        """ Get the dictionary of signatures to match.
+
+            Any container hosting code matched by these signatures should have
+            its user be labeled for deprovisioning as soon as they are detected.
+
+            Returns:
+                A dictionary containing signatures of especially disruptive code.
+        """
+
+        sigs_path = '/secrets/takedown_sigs.yml'
+
+        sig_dict = {}
+
+        if os.path.isfile(sigs_path):
+            with open(sigs_path, 'r') as sig_config:
+                yaml_config = yaml.load(sig_config)
+
+                if yaml_config['Immediate_Takedown']:
+                    sig_dict = yaml_config['Immediate_Takedown']
+
+        print(type(sig_dict), sig_dict)
+        return sig_dict
+
+
+    def start_serve(self, sig_dict):
+        """ Listen on specified port for incoming clam logs. """
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        server_address = ('localhost', 8080)
+        sock.bind(server_address)
+
+        sock.listen(1)
+
+        while True:
+            connection, _ = sock.accept()
+
+            try:
+                while True:
+                    data = connection.recv(10240)
+                    newdata = data.split('\n')[6]
+                    rec_js = json.loads(newdata)
+
+                    if 'results' not in newdata:
+                        break
+
+                    else:
+                        sig_name = rec_js['results']['description']
+                        pod_ns = rec_js['nameSpace'].strip('\'').strip('\"')
+
+                        reserved_ns = re.match(r'(^openshift-)', pod_ns, re.I)
+
+                        # don't process results for reserved namespaces
+                        if not reserved_ns and sig_name in sig_dict:
+
+#                            try:
+                            #if sig_name in sig_dict:
+                            self.annotate(pod_ns)
+#                            except KeyError:
+#                                pass
+
+                            #container_id = rec_js['containerID']
+                            #pod_name = rec_js['podName']
+
+    #                        filemode = ''
+    #                        if os.path.isfile(logfile):
+    #                            filemode = 'a'
+    #                        else:
+    #                            filemode = 'w'
+    #
+    #                        with open(logfile, filemode) as open_file:
+    #                            open_file.write(json.dumps(rec_js, indent=4, sort_keys=True))
+    #
+    #                        inspectlog = logfile + 'inspect_output.log'
+    #
+    #                        if os.path.isfile(inspectlog):
+    #                            filemode = 'a'
+    #                        else:
+    #                            filemode = 'w'
+    #
+    #                        with open(inspectlog, filemode) as open_file:
+    #                            open_file.write(['test'])
+                            break
+
+            finally:
+                connection.close()
+
+
+    def main(self):
+        """ Main function. """
+#        self.gather_images()
+
+        sig_dict = self.load_sigs()
+        self.start_serve(sig_dict)
+#        scan_q = Queue()
+#        worker = Thread(target=self.scan_worker, args=(scan_q,))
+#        worker.setDaemon(True)
+#        worker.start()
+
+        #self.(scan_q)
+
+
+if __name__ == '__main__':
+    EVENTLISTENER = PlegEventListener()
+    EVENTLISTENER.main()

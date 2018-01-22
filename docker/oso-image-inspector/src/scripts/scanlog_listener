@@ -55,7 +55,6 @@ class ClamLogSrv(object):
 
             try:
                 while True:
-                    # pylint: disable=no-member
                     data = connection.recv(10240)
                     newdata = data.split('\n')[6]
                     rec_js = json.loads(newdata)
@@ -84,8 +83,8 @@ class ClamLogSrv(object):
                             container_id
                                                                    ])
 
-                            rec_js['nameSpace'] = container_ns.split()[0]
-                            rec_js['podName'] = container_ns.split()[1]
+                            rec_js['nameSpace'] = container_ns.split()[0].strip('\'').strip('\"')
+                            rec_js['podName'] = container_ns.split()[1].strip('\'').strip('\"')
                             open_file.write(json.dumps(rec_js, indent=4, sort_keys=True))
 
                         inspectlog = logfile + 'inspect_output.log'
