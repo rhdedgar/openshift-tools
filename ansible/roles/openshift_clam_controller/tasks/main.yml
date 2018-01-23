@@ -22,7 +22,7 @@
   delay: 5
 
 - name: "join with image-inspector project network"
-  command: "oc adm pod-network join-projects {{ occ_namespace }} openshift-image-inspector"
+  command: "oc adm pod-network join-projects --to={{ occ_namespace }} openshift-image-inspector"
   delegate_to: "{{ cluster_master }}"
   run_once: true
   ignore_errors: true
@@ -33,13 +33,13 @@
     namespace: "{{ occ_namespace }}" 
 
 - name: "annotate {{ occ_namespace }} project"
-  command: "oc annotate ns {{ occ_namespace }} openshift.io/nodeselector=clam-server-enabled=True"
+  command: "oc annotate ns {{ occ_namespace }} openshift.io/node-selector=clam-controller-enabled=True"
   delegate_to: "{{ cluster_master }}"
   run_once: true
   ignore_errors: true
 
 - name: set service account permissions
-  command: "oc adm policy {{ item.r_kind }} {{ item.r_name }} system:serviceaccount:{{ occ_namespace }}:clamserver"
+  command: "oc adm policy {{ item.r_kind }} {{ item.r_name }} system:serviceaccount:{{ occ_namespace }}:clamcontroller"
   delegate_to: "{{ cluster_master }}"
   run_once: true
   ignore_errors: true

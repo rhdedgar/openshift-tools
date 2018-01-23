@@ -9,8 +9,11 @@
 # 
 
 
+if ! grep -qi 'Red Hat Enterprise Linux' /etc/redhat-release ; then
+  echo "ERROR: We only allow pushing from a RHEL machine because it allows secrets volumes."
+  exit 1
+fi
 
 echo
-echo "Pushing oso-centos7-clam-controller..."
-echo "Ensure you have successfully authenticated against docker with a 'docker login'"
-sudo docker push openshifttools/oso-centos7-clam-controller
+echo "Pushing oso-rhel7-image-inspector..."
+echo "oso-rhel7-image-inspector isn't pushed to any Docker repository"

@@ -117,6 +117,19 @@ objects:
         name: "library/oso-${PLAT}-clam-controller:latest"
       importPolicy: {}
       name: latest
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: oso-clam-controller
+    annotations:
+      description: service for openshift-clam-controller
+  spec:
+    ports:
+    - name: web
+      port: 8080
+      targetPort: 8080
+    selector:
+      name: oso-clam-controller
 - apiVersion: extensions/v1beta1
   kind: DaemonSet
   metadata:

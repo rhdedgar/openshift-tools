@@ -11,6 +11,6 @@
 
 
 echo
-echo "Pushing oso-centos7-clam-controller..."
+echo "Pushing oso-centos7-image-inspector..."
 echo "Ensure you have successfully authenticated against docker with a 'docker login'"
-sudo docker push openshifttools/oso-centos7-clam-controller
+sudo docker push openshifttools/oso-centos7-image-inspector

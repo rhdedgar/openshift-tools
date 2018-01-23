@@ -9,10 +9,10 @@ fi
 {% endif %}
 
 echo
-echo "Pushing oso-{{ base_os }}-clam-controller..."
+echo "Pushing oso-{{ base_os }}-image-inspector..."
 {% if base_os == "rhel7" %}
-echo "oso-rhel7-clam-controller isn't pushed to any Docker repository"
+echo "oso-rhel7-image-inspector isn't pushed to any Docker repository"
 {% elif base_os == "centos7" %}
 echo "Ensure you have successfully authenticated against docker with a 'docker login'"
-sudo docker push openshifttools/oso-centos7-clam-controller
+sudo docker push openshifttools/oso-centos7-image-inspector
 {% endif %}

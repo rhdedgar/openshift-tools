@@ -28,7 +28,7 @@
   delay: 5
 
 - name: "annotate {{ ocs_namespace }} project"
-  command: "oc annotate ns {{ ocs_namespace }} openshift.io/nodeselector=clam-server-enabled=True"
+  command: "oc annotate ns {{ ocs_namespace }} openshift.io/node-selector=clam-server-enabled=True"
   delegate_to: "{{ cluster_master }}"
   run_once: true
   ignore_errors: true

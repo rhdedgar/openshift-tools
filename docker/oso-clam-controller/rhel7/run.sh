@@ -9,6 +9,6 @@
 # 
 
 
-echo -n "Running oso-rhel7-image-inspector... "
-sudo docker run -ti --net=host --rm=true --name oso-image-inspector oso-rhel7-image-inspector $@
+echo -n "Running oso-rhel7-clam-controller... "
+sudo docker run -ti --net=host --rm=true --name oso-clam-controller oso-rhel7-clam-controller $@
 echo "Done."

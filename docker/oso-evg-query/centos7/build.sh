@@ -26,5 +26,5 @@ trap handle_err ERR
 sudo echo -e "\nTesting sudo works...\n"
 
 cd $(dirname $0)
-sudo time docker build -t oso-clam-controller .
-sudo docker tag oso-clam-controller openshifttools/oso-centos7-clam-controller:latest
+sudo time docker build -t oso-image-inspector .
+sudo docker tag oso-image-inspector openshifttools/oso-centos7-image-inspector:latest

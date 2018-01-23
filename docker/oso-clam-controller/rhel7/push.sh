@@ -15,5 +15,5 @@ if ! grep -qi 'Red Hat Enterprise Linux' /etc/redhat-release ; then
 fi
 
 echo
-echo "Pushing oso-rhel7-image-inspector..."
-echo "oso-rhel7-image-inspector isn't pushed to any Docker repository"
+echo "Pushing oso-rhel7-clam-controller..."
+echo "oso-rhel7-clam-controller isn't pushed to any Docker repository"

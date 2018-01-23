@@ -6,36 +6,49 @@ metadata:
   generation: 1
   labels:
     provider: openshift
-    image-inspector-host: "true"
-    component: image-inspector
-  name: oso-image-inspector 
+    clam-controller-host: "true"
+    component: clam-controller
+  name: oso-clam-controller 
 objects:
 - apiVersion: v1
   kind: ImageStream
   metadata:
     labels:
-      template: oso-image-inspector
-    name: "oso-${PLAT}-image-inspector"
+      template: oso-clam-controller
+    name: "oso-${PLAT}-clam-controller"
   spec:
     tags:
     - annotations: null
       from:
         kind: DockerImage
-        name: "registry.reg-aws.openshift.com:443/openshift-image-inspector/oso-${PLAT}-image-inspector:latest"
+        name: "registry.reg-aws.openshift.com:443/openshift-clam-controller/oso-${PLAT}-clam-controller:latest"
         pullSecret:
           name: dockercfgjson
       importPolicy: {}
       name: latest
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: oso-clam-controller
+    annotations:
+      description: service for openshift-clam-controller
+  spec:
+    ports:
+    - name: web
+      port: 8080
+      targetPort: 8080
+    selector:
+      name: oso-clam-controller
 - apiVersion: extensions/v1beta1
   kind: DaemonSet
   metadata:
     labels:
-      template: oso-image-inspector
-      component: image-inspector
-    name: oso-image-inspector
+      template: oso-clam-controller
+      component: clam-controller
+    name: oso-clam-controller
   selector:
     matchLabels:
-      name: oso-image-inspector
+      name: oso-clam-controller
   spec:
     strategy:
       resources: {}
@@ -43,18 +56,18 @@ objects:
     template:
       metadata:
         creationTimestamp: null
-        name: oso-image-inspector
+        name: oso-clam-controller
         labels:
-          name: oso-image-inspector
-          component: image-inspector
+          name: oso-clam-controller
+          component: clam-controller
       spec:
         containers:
         - env:
           - name: OO_PAUSE_ON_START
             value: "false"
-          image: "${NAMESPACE}/oso-${PLAT}-image-inspector:latest"
+          image: "${NAMESPACE}/oso-${PLAT}-clam-controller:latest"
           imagePullPolicy: Always
-          name: oso-image-inspector 
+          name: oso-clam-controller 
           resources: {}
           securityContext:
             privileged: true
@@ -62,34 +75,34 @@ objects:
           terminationMessagePath: /dev/termination-log
           volumeMounts:
           - mountPath: /host
-            name: oso-image-inspector-host-filesystem
+            name: oso-clam-controller-host-filesystem
           - mountPath: /secrets
-            name: oso-image-inspector-secrets
+            name: oso-clam-controller-secrets
         dnsPolicy: ClusterFirst
         nodeSelector:
-          image-inspector-enabled: "True"
+          clam-controller-enabled: "True"
         restartPolicy: Always
         securityContext: {}
-        serviceAccount: imageinspector
-        serviceAccountName: imageinspector
+        serviceAccount: clamcontroller
+        serviceAccountName: clamcontroller
         terminationGracePeriodSeconds: 30
         volumes:
-        - name: oso-image-inspector-host-filesystem
+        - name: oso-clam-controller-host-filesystem
           hostPath:
             path: /
-        - name: oso-image-inspector-secrets
+        - name: oso-clam-controller-secrets
           secret:
-            secretName: oso-image-inspector-secrets
+            secretName: oso-clam-controller-secrets
     test: false
     triggers:
     - type: ConfigChange
     - imageChangeParams:
         automatic: true
         containerNames:
-        - oso-image-inspector
+        - oso-clam-controller
         from:
           kind: ImageStreamTag
-          name: "oso-${PLAT}-image-inspector:latest"
+          name: "oso-${PLAT}-clam-controller:latest"
       type: ImageChange
 parameters:
 - description: Platform name
@@ -97,4 +110,4 @@ parameters:
   value: rhel7
 - description: Project name
   name: NAMESPACE
-  value: openshift-image-inspector
+  value: openshift-clam-controller
