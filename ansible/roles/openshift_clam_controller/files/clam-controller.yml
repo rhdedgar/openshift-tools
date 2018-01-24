@@ -156,6 +156,7 @@ objects:
             value: "false"
           image: "${NAMESPACE}/oso-${PLAT}-clam-controller:latest"
           imagePullPolicy: Always
+          noCache: true
           name: oso-clam-controller 
           resources: {}
           securityContext:
