@@ -11,6 +11,7 @@
       minute: 1
       hour: 1
       day: 1
+      month: 3
       job: "/usr/local/bin/scan_images &>/dev/null"
 
   tasks:

@@ -3,14 +3,14 @@
 # This is useful so we can debug containers running inside of OpenShift that are
 # failing to start properly.
 
-#if [ "$OO_PAUSE_ON_START" = "true" ] ; then
-echo
-echo "This container's startup has been paused indefinitely because OO_PAUSE_ON_START has been set."
-echo
-while true; do
-  sleep 10    
-done
-#fi
+if [ "$OO_PAUSE_ON_START" = "true" ] ; then
+  echo
+  echo "This container's startup has been paused indefinitely because OO_PAUSE_ON_START has been set."
+  echo
+  while true; do
+    sleep 10    
+  done
+fi
 
 echo "Running config playbook"
 ansible-playbook /root/config.yml
@@ -24,12 +24,9 @@ echo
 echo '/usr/local/bin/clam-controller'
 
 echo
-echo 'Always listen for new containers. Container scanning queue will inspect one container at a time in FIFO order.'
+echo 'Always listen for positive scan logs from image inspector pods.'
 echo '----------------'
-/usr/local/bin/orchestrator &
-echo 'Always listen for new scan logs. Scanning is scheduled once per day for all pods on the node.'
-echo '----------------'
-/usr/local/bin/scanlog_listener -s localhost -p 8080 -l /var/log/clam/scan.log &
+/usr/local/bin/clam-controller &
 echo 'Starting crond'
 echo '---------------'
 exec /usr/sbin/crond -n -m off
