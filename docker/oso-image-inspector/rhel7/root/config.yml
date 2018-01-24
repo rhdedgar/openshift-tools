@@ -3,7 +3,7 @@
   gather_facts: no
   vars_files:
   - /root/default_vars.yml
-  - /host/etc/origin/node/node-config.yaml
+  - /host/etc/openshift_tools/monitoring-config.yml
 
   vars:
     scanning_cron:
@@ -50,15 +50,11 @@
       ii_state: touch
       ii_recurse: no
 
-  - name: Make node name accessible
-    set_fact:
-      temp_name: "{{ kubeletArguments['node-labels'] }}"
-
   - name: populate templated config file
     copy:
       content: |
-        node_hostname: {{ temp_name[4].split('=')[1] }}
-        cluster_name: {{ temp_name[4].split('=')[1].split('-node')[0] }}
+        node_hostname: {{ metric_sender_config['host']['name'] }}
+        cluster_name: {{ oso_cluster_id }}
       dest: /etc/openshift_tools/scanreport_config.yml
 
   # Running as commands because mount module doesn't mount properly on some clusters
