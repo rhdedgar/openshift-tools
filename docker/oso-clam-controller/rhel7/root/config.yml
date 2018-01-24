@@ -42,7 +42,7 @@
     copy:
       content: |
         node_hostname: {{ metric_sender_config['host']['name'] }}
-        cluster_name: {{ metric_sender_config['oso_cluster_id'] }}
+        cluster_name: {{ oso_cluster_id }}
       dest: /etc/openshift_tools/scanreport_config.yml
 
   - name: Setup Cron
