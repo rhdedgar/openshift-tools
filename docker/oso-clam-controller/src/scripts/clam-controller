@@ -185,8 +185,9 @@ class PlegEventListener(object):
         """ Listen on specified port for incoming clam logs. """
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        host = socket.gethostname()
 
-        server_address = ('localhost', 8080)
+        server_address = (host, 8080)
         sock.bind(server_address)
 
         sock.listen(1)
