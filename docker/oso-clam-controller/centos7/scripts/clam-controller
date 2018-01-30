@@ -1,4 +1,4 @@
-#!/bin/env python
+#!/bin/env python3.4
 # vim: expandtab:tabstop=4:shiftwidth=4
 
 """ Listen for kubernetes PLEG creation events, and launch an
@@ -129,7 +129,6 @@ class PlegEventListener(object):
     def annotate(namespace, sig_name, reserved_ns, sig_dict):
         """ Annotate the specified user for deprovisioning. """
 
-        # don't process results for reserved namespaces
         if not reserved_ns and sig_name.split()[0] in sig_dict:
 
             des_proj_cmd = ['chroot', \
@@ -142,7 +141,7 @@ class PlegEventListener(object):
                             '{{index .metadata.annotations "openshift.io/requester"}}\'' \
                            ]
 
-            user_name = subprocess.check_output(des_proj_cmd).strip('\'').strip('\"')
+            user_name = subprocess.check_output(des_proj_cmd).strip(b'\'').strip(b'\"')
 
             anno_cmd = ['chroot', \
                         '/host', \
@@ -181,6 +180,23 @@ class PlegEventListener(object):
         return sig_dict
 
 
+    def convert_types(self, data):
+        """ Used to convert dicts of bytes received as json.
+
+            Returns:
+                a dict of strings
+                a string converted from bytes
+         """
+
+        if isinstance(data, bytes):
+            return data.decode('ascii')
+        if isinstance(data, dict):
+            return dict(map(self.convert_types, data.items()))
+        if isinstance(data, tuple):
+            return map(self.convert_types, data)
+        return data
+
+
     def start_serve(self, sig_dict):
         """ Listen on specified port for incoming clam logs. """
 
@@ -197,16 +213,18 @@ class PlegEventListener(object):
 
             try:
                 while True:
+                    # pylint: disable=no-member
                     data = connection.recv(10240)
-                    newdata = data.split('\n')[7]
+                    newdata = data.split(b'\r\n\r\n')[1].strip(b"'")
 
-                    if 'results' not in newdata:
-                        break
+                    conv_js = self.convert_types(newdata)
 
                     try:
-                        rec_js = json.loads(newdata)
+                        rec_js = json.loads(conv_js)
                     except ValueError:
-                        print('Failed to parse data:\n', newdata)
+                        rec_js = conv_js
+
+                    if isinstance(rec_js, dict) and 'results' not in rec_js:
                         break
 
                     else:
@@ -215,7 +233,7 @@ class PlegEventListener(object):
                             pod_ns = rec_js['nameSpace'].strip('\'').strip('\"')
 
                             reserved_ns = re.match(r'(^openshift-)', pod_ns, re.I)
-
+                            # exclude default namespace too
                             self.annotate(pod_ns, sig_name, reserved_ns, sig_dict)
 
                         break

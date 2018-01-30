@@ -13,6 +13,9 @@ RUN yum install -y python2-boto3 \
                    systemd-python \
                    python-requests \
                    openscap-scanner \
+                   python34 \
+                   python34-libs \
+                   python34-PyYAML \
                    python2-botocore && \
     yum clean all
 
