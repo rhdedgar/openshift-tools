@@ -183,7 +183,7 @@ class ClamLogSrv(object):
                 yaml_config = yaml.load(log_config)
 
                 try:
-                    config_settings['oii_control_name'] = yaml_config['oii_control_name']
+                    config_settings['oii_control_host'] = yaml_config['oii_control_host']
                 except KeyError:
                     pass
 
