@@ -20,6 +20,12 @@
   retries: 12
   delay: 5
 
+- name: "join with clam-controller project network"
+  command: "oc adm pod-network join-projects --to=openshift-clam-controller {{ oii_namespace }}"
+  delegate_to: "{{ cluster_master }}"
+  run_once: true
+  ignore_errors: true
+
 - name: create imageinspector serviceaccount
   oc_serviceaccount:
     name: imageinspector
