@@ -1,11 +1,11 @@
 package inspector
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+
 	"testing"
 
 	docker "github.com/fsouza/go-dockerclient"
@@ -13,39 +13,18 @@ import (
 	iicmd "github.com/openshift/image-inspector/pkg/cmd"
 )
 
-type FailMockScanner struct{}
-type SuccMockScanner struct {
-	FailMockScanner
-}
-type NoResMockScanner struct {
-	SuccMockScanner
-}
-type SuccWithReportMockScanner struct {
-	SuccMockScanner
-}
-
-func (ms *FailMockScanner) Scan(context.Context, string, *docker.Image, iiapi.FilesFilter) ([]iiapi.Result, interface{}, error) {
-	return nil, nil, fmt.Errorf("FAIL SCANNER!")
-}
-func (ms *FailMockScanner) Name() string {
-	return "MockScanner"
-}
-func (ms *SuccMockScanner) Scan(context.Context, string, *docker.Image, iiapi.FilesFilter) ([]iiapi.Result, interface{}, error) {
-	return []iiapi.Result{}, nil, nil
-}
-
-func TestScanImage(t *testing.T) {
-	ctx := context.Background()
+func TestAcquiringInInspect(t *testing.T) {
 	for k, v := range map[string]struct {
-		ii         defaultImageInspector
-		s          iiapi.Scanner
-		shouldFail bool
+		ii             defaultImageInspector
+		shouldFail     bool
+		expectedAcqErr string
 	}{
-		"Scanner fails on scan": {ii: defaultImageInspector{}, s: &FailMockScanner{}, shouldFail: true},
-		"Happy Flow":            {ii: defaultImageInspector{}, s: &SuccMockScanner{}, shouldFail: false},
+		"Scanner fails on scan": {ii: defaultImageInspector{opts: iicmd.ImageInspectorOptions{URI: "No such file", Serve: ""}},
+			shouldFail:     true,
+			expectedAcqErr: "invalid endpoint",
+		},
 	} {
-		v.ii.opts.DstPath = "here"
-		_, _, err := v.s.Scan(ctx, v.ii.opts.DstPath, nil, nil)
+		err := v.ii.Inspect()
 		if v.shouldFail && err == nil {
 			t.Errorf("%s should have failed but it didn't!", k)
 		}
@@ -53,6 +32,9 @@ func TestScanImage(t *testing.T) {
 			if err != nil {
 				t.Errorf("%s should have succeeded but failed with %v", k, err)
 			}
+		}
+		if v.ii.meta.ImageAcquireError != v.expectedAcqErr {
+			t.Errorf("%s acquire error is not matching.\nExtected: %v\nReceived: %v\n", k, v.expectedAcqErr, v.ii.meta.ImageAcquireError)
 		}
 	}
 }
@@ -95,7 +77,7 @@ func TestGetAuthConfigs(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		ii := &defaultImageInspector{*v.opts, iiapi.InspectorMetadata{}, nil}
+		ii := &defaultImageInspector{*v.opts, iiapi.InspectorMetadata{}, nil, scanOutputs{}}
 		auths, err := ii.getAuthConfigs()
 		if !v.shouldFail {
 			if err != nil {
@@ -134,14 +116,19 @@ func Test_decodeDockerResponse(t *testing.T) {
 
 	for test_name, test_params := range tests {
 		parsedErrors := make(chan error, 100)
-		defer func() { close(parsedErrors) }()
+		finished := make(chan bool, 1)
+		defer func() {
+			<-finished // wait for decodeDockerResponse to finish
+			close(finished)
+			close(parsedErrors)
+		}()
 
 		go func() {
 			reader, writer := io.Pipe()
 			// handle closing the reader/writer in the method that creates them
 			defer reader.Close()
 			defer writer.Close()
-			go decodeDockerResponse(parsedErrors, reader)
+			go decodeDockerResponse(parsedErrors, reader, finished)
 			writer.Write([]byte(test_params.readerInput))
 		}()
 
@@ -209,6 +196,158 @@ func TestCreateOutputDir(t *testing.T) {
 		} else {
 			if err != nil {
 				t.Errorf("%s should have succeeded but failed with %v", k, err)
+			}
+		}
+	}
+}
+
+type mockDockerRuntimeClient struct{}
+
+func (c mockDockerRuntimeClient) InspectImage(name string) (*docker.Image, error) {
+	return nil, fmt.Errorf("mockDockerRuntimeClient FAIL")
+}
+func (c mockDockerRuntimeClient) ContainerChanges(id string) ([]docker.Change, error) {
+	return nil, fmt.Errorf("mockDockerRuntimeClient FAIL")
+}
+func (c mockDockerRuntimeClient) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
+	return fmt.Errorf("mockDockerRuntimeClient FAIL")
+}
+func (c mockDockerRuntimeClient) CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error) {
+	return nil, fmt.Errorf("mockDockerRuntimeClient FAIL")
+}
+func (c mockDockerRuntimeClient) RemoveContainer(opts docker.RemoveContainerOptions) error {
+	return fmt.Errorf("mockDockerRuntimeClient FAIL")
+}
+func (c mockDockerRuntimeClient) InspectContainer(id string) (*docker.Container, error) {
+	return nil, fmt.Errorf("mockDockerRuntimeClient FAIL")
+}
+func (c mockDockerRuntimeClient) DownloadFromContainer(id string, opts docker.DownloadFromContainerOptions) error {
+	return fmt.Errorf("mockDockerRuntimeClient FAIL")
+}
+
+type mockRuntimeClientPullSuccess struct {
+	mockDockerRuntimeClient
+}
+
+func (c mockRuntimeClientPullSuccess) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
+	return nil
+}
+
+type mockRuntimeClientInspectSuccess struct {
+	mockDockerRuntimeClient
+}
+
+func (c mockRuntimeClientInspectSuccess) InspectImage(name string) (*docker.Image, error) {
+	return &docker.Image{}, nil
+}
+
+type mockDockerRuntimeClientAllSuccess struct{}
+
+func (c mockDockerRuntimeClientAllSuccess) InspectImage(name string) (*docker.Image, error) {
+	return &docker.Image{}, nil
+}
+func (c mockDockerRuntimeClientAllSuccess) ContainerChanges(id string) ([]docker.Change, error) {
+	return []docker.Change{}, nil
+}
+func (c mockDockerRuntimeClientAllSuccess) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
+	return nil
+}
+func (c mockDockerRuntimeClientAllSuccess) CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error) {
+	return &docker.Container{}, nil
+}
+func (c mockDockerRuntimeClientAllSuccess) RemoveContainer(opts docker.RemoveContainerOptions) error {
+	return nil
+}
+func (c mockDockerRuntimeClientAllSuccess) InspectContainer(id string) (*docker.Container, error) {
+	return &docker.Container{}, nil
+}
+func (c mockDockerRuntimeClientAllSuccess) DownloadFromContainer(id string, opts docker.DownloadFromContainerOptions) error {
+	return nil
+}
+
+type mockRuntimeClientAllSuccessButContainerChanges struct {
+	mockDockerRuntimeClientAllSuccess
+}
+
+func (c mockRuntimeClientAllSuccessButContainerChanges) ContainerChanges(id string) ([]docker.Change, error) {
+	return []docker.Change{}, fmt.Errorf("mockDockerRuntimeClient FAIL")
+}
+
+func TestPullImage(t *testing.T) {
+	for k, v := range map[string]struct {
+		client      DockerRuntimeClient
+		shouldFail  bool
+		expectedErr string
+	}{
+		"With instant pull failing client": {shouldFail: true,
+			client:      mockDockerRuntimeClient{},
+			expectedErr: "Unable to pull docker image: mockDockerRuntimeClient FAIL"},
+		"With instant pull success client": {shouldFail: false,
+			client: mockRuntimeClientPullSuccess{}},
+	} {
+		ii := &defaultImageInspector{iicmd.ImageInspectorOptions{Image: "NoSuchImage!"}, iiapi.InspectorMetadata{}, nil, scanOutputs{}}
+		err := ii.pullImage(v.client)
+		if v.shouldFail {
+			if err == nil {
+				t.Errorf("%s should have failed but it didn't", k)
+			} else {
+				if err.Error() != v.expectedErr {
+					t.Errorf("Wrong error message for %s.\nExpected: %s\nReceived: %s\n", k, v.expectedErr, err.Error())
+				}
+			}
+		} else {
+			if err != nil {
+				t.Errorf("%s should not have failed with: %s", k, err.Error())
+			}
+		}
+	}
+}
+
+func TestAcquireImage(t *testing.T) {
+	noContainerPullNever := iicmd.ImageInspectorOptions{Image: "noSuchImage", Container: "", PullPolicy: iiapi.PullNever}
+	noContainerPullAlways := iicmd.ImageInspectorOptions{Image: "noSuchImage", Container: "", PullPolicy: iiapi.PullAlways}
+	noContainerPullNotPresent := iicmd.ImageInspectorOptions{Image: "noSuchImage", Container: "", PullPolicy: iiapi.PullIfNotPresent}
+
+	fromContainer := iicmd.ImageInspectorOptions{Container: "I am a container", ScanContainerChanges: true}
+
+	for k, v := range map[string]struct {
+		opts        iicmd.ImageInspectorOptions
+		client      DockerRuntimeClient
+		shouldFail  bool
+		expectedErr string
+	}{
+		"When unable to inspect image and also never pull": {opts: noContainerPullNever, shouldFail: true,
+			client: mockDockerRuntimeClient{},
+			expectedErr: fmt.Sprintf("Image %s is not available and pull-policy %s doesn't allow pulling",
+				noContainerPullNever.Image, noContainerPullNever.PullPolicy)},
+		"When unable to inspect or pull image and also always pull": {opts: noContainerPullAlways, shouldFail: true,
+			client:      mockDockerRuntimeClient{},
+			expectedErr: "Unable to pull docker image: mockDockerRuntimeClient FAIL"},
+		"When unable to inspect or pull image and also pull if no present": {opts: noContainerPullNotPresent, shouldFail: true,
+			client:      mockDockerRuntimeClient{},
+			expectedErr: "Unable to pull docker image: mockDockerRuntimeClient FAIL"},
+		"Unable to inspect running container": {opts: fromContainer, shouldFail: true,
+			client:      mockDockerRuntimeClient{},
+			expectedErr: "Unable to get docker container information: mockDockerRuntimeClient FAIL"},
+		"Cannot get container changes": {opts: fromContainer, shouldFail: true,
+			client:      mockRuntimeClientAllSuccessButContainerChanges{},
+			expectedErr: "Unable to get docker container changes: mockDockerRuntimeClient FAIL"},
+		"Success with running Container": {opts: fromContainer, shouldFail: false,
+			client: mockDockerRuntimeClientAllSuccess{}},
+	} {
+		ii := &defaultImageInspector{v.opts, iiapi.InspectorMetadata{}, nil, scanOutputs{}}
+		err, _ := ii.acquireImage(v.client)
+		if v.shouldFail {
+			if err == nil {
+				t.Errorf("%s should have failed but it didn't", k)
+			} else {
+				if err.Error() != v.expectedErr {
+					t.Errorf("Wrong error message for %s.\nExpected: %s\nReceived: %s\n", k, v.expectedErr, err.Error())
+				}
+			}
+		} else {
+			if err != nil {
+				t.Errorf("%s should not have failed with: %s", k, err.Error())
 			}
 		}
 	}

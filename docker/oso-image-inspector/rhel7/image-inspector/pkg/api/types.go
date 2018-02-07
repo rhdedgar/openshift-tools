@@ -93,6 +93,8 @@ var (
 
 // InspectorMetadata is the metadata type with information about image-inspector's operation
 type InspectorMetadata struct {
+	ImageAcquireError string // error from aquiring the image
+
 	docker.Image // Metadata about the inspected image
 
 	// OpenSCAP describes the state of the OpenSCAP scan
