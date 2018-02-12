@@ -24,7 +24,8 @@ objects:
         name: "registry.reg-aws.openshift.com:443/openshift-clam-server/oso-${PLAT}-clam-server:latest"
         pullSecret:
           name: dockercfgjson
-      importPolicy: {}
+      importPolicy:
+        scheduled: true
       name: latest
 - apiVersion: extensions/v1beta1
   kind: DaemonSet
