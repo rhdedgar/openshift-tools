@@ -36,29 +36,7 @@ ENV GOBIN=/bin \
     GOPATH=/go
 
 # Make mount point for host filesystem and compile scanning utilities
-RUN mkdir -p /host /run/clamd.scan /tmp/scan-data /var/lib/image-inspector && \ #go get \
-#    github.com/golang/glog \
-#    github.com/spf13/cobra \
-#    github.com/spf13/pflag \
-#    github.com/docker/libtrust \
-#    github.com/docker/go-connections \
-#    github.com/ghodss/yaml \
-#    github.com/imdario/mergo \
-#    github.com/mtrmac/gpgme \
-#    github.com/opencontainers/go-digest \
-#    github.com/opencontainers/image-spec/specs-go \
-#    github.com/opencontainers/image-spec/specs-go/v1 \
-#    github.com/opencontainers/selinux/go-selinux \
-#    github.com/sirupsen/logrus \
-#    github.com/vbatts/tar-split/tar/asm \
-#    github.com/vbatts/tar-split/tar/storage \
-#    golang.org/x/crypto/openpgp \
-#    golang.org/x/net/http2 \
-#    golang.org/x/net/proxy \
-#    gopkg.in/cheggaaa/pb.v1 \
-#    k8s.io/client-go/util/homedir \
-#    github.com/fsouza/go-dockerclient && \
-#    cd /go/src/golang.org/x && \
+RUN mkdir -p /host /run/clamd.scan /tmp/scan-data /var/lib/image-inspector && \
     go install -tags 'containers_image_openpgp exclude_graphdriver_devicemapper exclude_graphdriver_btrfs' \
     -a -installsuffix cgo /go/src/github.com/openshift/image-inspector/cmd/image-inspector.go && \
     cd  /go/src/github.com/openshift/clam-scanner && \
