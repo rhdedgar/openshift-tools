@@ -2,6 +2,9 @@
 
 FROM openshifttools/oso-centos7-ops-base:latest
 
+# Pause indefinitely if asked to do so.
+ARG OO_PAUSE_ON_BUILD
+RUN test "$OO_PAUSE_ON_BUILD" = "true" && while sleep 10; do true; done || :
 
 # Add root folder
 ADD root/ /root/
@@ -32,10 +35,6 @@ ENV GOBIN=/bin \
     CGO_ENABLED=0 \
     GOPATH=/go
 
-# Pause indefinitely if asked to do so.
-ARG OO_PAUSE_ON_BUILD
-RUN test "$OO_PAUSE_ON_BUILD" = "true" && while sleep 10; do true; done || :
-
 # Make mount point for host filesystem and compile scanning utilities
 RUN go get \
     github.com/golang/glog \
@@ -58,9 +57,9 @@ RUN go get \
 #    golang.org/x/net/proxy \
 #    gopkg.in/cheggaaa/pb.v1 \
 #    k8s.io/client-go/util/homedir \
-#    github.com/fsouza/go-dockerclient && \
+    github.com/fsouza/go-dockerclient && \
     mkdir -p /host /run/clamd.scan /tmp/scan-data /var/lib/image-inspector && \
-    cd /go/src/golang.org/x && \
+#    cd /go/src/golang.org/x && \
     go install -tags 'containers_image_openpgp exclude_graphdriver_devicemapper exclude_graphdriver_btrfs' \
     -a -installsuffix cgo /go/src/github.com/openshift/image-inspector/cmd/image-inspector.go && \
     cd  /go/src/github.com/openshift/clam-scanner && \
