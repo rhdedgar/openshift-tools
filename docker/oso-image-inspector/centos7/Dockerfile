@@ -36,7 +36,7 @@ ENV GOBIN=/bin \
     GOPATH=/go
 
 # Make mount point for host filesystem and compile scanning utilities
-RUN go get
+RUN go get \
     github.com/golang/glog \
     github.com/spf13/cobra \
     github.com/spf13/pflag \
