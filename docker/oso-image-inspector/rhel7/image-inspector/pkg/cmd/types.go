@@ -12,7 +12,7 @@ import (
 	util "github.com/openshift/image-inspector/pkg/util"
 )
 
-const DefaultDockerSocketLocation = "unix:///host/var/run/docker.sock"
+const DefaultDockerSocketLocation = "unix:///var/run/docker.sock"
 
 // MultiStringVar is implementing flag.Value
 type MultiStringVar struct {
@@ -91,7 +91,7 @@ func NewDefaultImageInspectorOptions() *ImageInspectorOptions {
 		DockerCfg:        MultiStringVar{[]string{}},
 		CVEUrlPath:       oscapscanner.CVEUrl,
 		UseDockerSocket:  true,
-		DockerSocket:     "unix:///host/var/run/docker.sock",
+		DockerSocket:     "unix:///var/run/docker.sock",
 		Image:            "",
 		DstPath:          "",
 		Serve:            "",

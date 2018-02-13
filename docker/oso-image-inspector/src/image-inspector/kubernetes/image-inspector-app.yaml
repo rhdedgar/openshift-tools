@@ -46,9 +46,9 @@ objects:
       - --serve=0.0.0.0:8080
       - --use-docker-socket=false
       - --scan-type=openscap
-      - --registry-cert-path=/host/var/run/secrets/kubernetes.io/serviceaccount/
+      - --registry-cert-path=/var/run/secrets/kubernetes.io/serviceaccount/
       - --username=foo
-      - --password-file=/host/var/run/secrets/kubernetes.io/serviceaccount/token
+      - --password-file=/var/run/secrets/kubernetes.io/serviceaccount/token
       ports:
       - containerPort: 8080
     serviceAccountName: ${SERVICEACCOUNT}
