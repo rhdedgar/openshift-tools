@@ -37,9 +37,9 @@ ENV GOBIN=/bin \
 
 # Make mount point for host filesystem and compile scanning utilities
 RUN go get \
-    github.com/golang/glog \
-    github.com/spf13/cobra \
-    github.com/spf13/pflag \
+#    github.com/golang/glog \
+#    github.com/spf13/cobra \
+#    github.com/spf13/pflag \
 #    github.com/docker/libtrust \
 #    github.com/docker/go-connections \
 #    github.com/ghodss/yaml \
@@ -57,7 +57,7 @@ RUN go get \
 #    golang.org/x/net/proxy \
 #    gopkg.in/cheggaaa/pb.v1 \
 #    k8s.io/client-go/util/homedir \
-    github.com/fsouza/go-dockerclient && \
+#    github.com/fsouza/go-dockerclient && \
     mkdir -p /host /run/clamd.scan /tmp/scan-data /var/lib/image-inspector && \
 #    cd /go/src/golang.org/x && \
     go install -tags 'containers_image_openpgp exclude_graphdriver_devicemapper exclude_graphdriver_btrfs' \
