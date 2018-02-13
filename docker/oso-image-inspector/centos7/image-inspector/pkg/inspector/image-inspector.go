@@ -1,7 +1,6 @@
 package inspector
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -13,20 +12,11 @@ import (
 	"math"
 	"math/big"
 	"net/http"
-	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/containers/image/copy"
-	"github.com/containers/image/directory"
-	"github.com/containers/image/manifest"
-	"github.com/containers/image/signature"
-	"github.com/containers/image/transports/alltransports"
-	"github.com/containers/image/types"
 	docker "github.com/fsouza/go-dockerclient"
-	"github.com/opencontainers/go-digest"
 	iiapi "github.com/openshift/image-inspector/pkg/api"
 	"github.com/openshift/image-inspector/pkg/clamav"
 	iicmd "github.com/openshift/image-inspector/pkg/cmd"
