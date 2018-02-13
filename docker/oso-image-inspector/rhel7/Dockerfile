@@ -36,7 +36,7 @@ ENV GOBIN=/bin \
     GOPATH=/go
 
 # Make mount point for host filesystem and compile scanning utilities
-RUN go get github.com/golang/glog github.com/spf13/cobra github.com/spf13/pflag && \
+RUN go get github.com/golang/glog github.com/spf13/cobra github.com/spf13/pflag github.com/fsouza/go-dockerclient && \
     mkdir -p /host /go/src/golang.org/x/net /run/clamd.scan /tmp/scan-data /var/lib/image-inspector && \
     cd /go/src/golang.org/x && \
     git clone https://github.com/golang/net.git --depth 1 && \
