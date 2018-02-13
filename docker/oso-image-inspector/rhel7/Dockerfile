@@ -37,10 +37,8 @@ ENV GOBIN=/bin \
 
 # Make mount point for host filesystem and compile scanning utilities
 RUN go get github.com/golang/glog github.com/spf13/cobra github.com/spf13/pflag github.com/fsouza/go-dockerclient && \
-    mkdir -p /host /go/src/golang.org/x/net /run/clamd.scan /tmp/scan-data /var/lib/image-inspector && \
+    mkdir -p /host /run/clamd.scan /tmp/scan-data /var/lib/image-inspector && \
     cd /go/src/golang.org/x && \
-    git clone https://github.com/golang/net.git --depth 1 && \
-    git clone https://github.com/docker/docker.git --depth 1 && \
     go install -tags 'containers_image_openpgp exclude_graphdriver_devicemapper exclude_graphdriver_btrfs' \
     -a -installsuffix cgo /go/src/github.com/openshift/image-inspector/cmd/image-inspector.go && \
     cd  /go/src/github.com/openshift/clam-scanner && \
