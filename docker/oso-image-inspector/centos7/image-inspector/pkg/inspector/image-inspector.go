@@ -3,26 +3,25 @@ package inspector
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
-	"math"
-	"math/big"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
+
 	iiapi "github.com/openshift/image-inspector/pkg/api"
 	"github.com/openshift/image-inspector/pkg/clamav"
 	iicmd "github.com/openshift/image-inspector/pkg/cmd"
 	apiserver "github.com/openshift/image-inspector/pkg/imageserver"
 	"github.com/openshift/image-inspector/pkg/openscap"
 	"github.com/openshift/image-inspector/pkg/util"
+
+	iacq "github.com/openshift/image-inspector/pkg/imageacquirer"
 )
 
 const (
@@ -36,8 +35,6 @@ const (
 	OPENSCAP_URL_PATH        = API_URL_PREFIX + "/" + VERSION_TAG + "/openscap"
 	OPENSCAP_REPORT_URL_PATH = API_URL_PREFIX + "/" + VERSION_TAG + "/openscap-report"
 	OSCAP_CVE_DIR            = "/tmp"
-	PULL_LOG_INTERVAL_SEC    = 10 * time.Second
-	DOCKER_CERTS_DIR         = "/etc/docker/certs.d"
 )
 
 var osMkdir = os.Mkdir
@@ -69,6 +66,20 @@ type defaultImageInspector struct {
 	imageServer apiserver.ImageServer
 
 	scanOutputs scanOutputs
+
+	ImageAcquirer iiapi.ImageAcquirer // ImageAcquirer that will get the image that needs scanning
+}
+
+func getAcquirer(opts *iicmd.ImageInspectorOptions) iiapi.ImageAcquirer {
+	if len(opts.Container) != 0 {
+		return iacq.NewDockerContainerImageAcquirer(opts.URI, opts.ScanContainerChanges)
+	}
+	authOpts := iacq.AuthsOptions{
+		DockerCfg:    opts.DockerCfg,
+		Username:     opts.Username,
+		PasswordFile: opts.PasswordFile,
+	}
+	return iacq.NewDockerImageAcquirer(opts.URI, opts.DstPath, opts.PullPolicy, authOpts)
 }
 
 // NewInspectorMetadata returns a new InspectorMetadata out of *docker.Image
@@ -93,22 +104,32 @@ func NewDefaultImageInspector(opts iicmd.ImageInspectorOptions) ImageInspector {
 
 	// if serving then set up an image server
 	if len(opts.Serve) > 0 {
-		imageServerOpts := apiserver.ImageServerOptions{
-			ServePath:         opts.Serve,
-			HealthzURL:        HEALTHZ_URL_PATH,
-			APIURL:            API_URL_PREFIX,
-			ResultAPIUrlPath:  RESULT_API_URL_PATH,
-			APIVersions:       iiapi.APIVersions{Versions: []string{VERSION_TAG}},
-			MetadataURL:       METADATA_URL_PATH,
-			ContentURL:        CONTENT_URL_PREFIX,
-			ScanType:          opts.ScanType,
-			ScanReportURL:     OPENSCAP_URL_PATH,
-			HTMLScanReport:    opts.OpenScapHTML,
-			HTMLScanReportURL: OPENSCAP_REPORT_URL_PATH,
-			AuthToken:         opts.AuthToken,
-			Chroot:            opts.Chroot,
+		if nil == opts.ImageServer {
+			imageServerOpts := apiserver.ImageServerOptions{
+				ServePath:         opts.Serve,
+				HealthzURL:        HEALTHZ_URL_PATH,
+				APIURL:            API_URL_PREFIX,
+				ResultAPIUrlPath:  RESULT_API_URL_PATH,
+				APIVersions:       iiapi.APIVersions{Versions: []string{VERSION_TAG}},
+				MetadataURL:       METADATA_URL_PATH,
+				ContentURL:        CONTENT_URL_PREFIX,
+				ScanType:          opts.ScanType,
+				ScanReportURL:     OPENSCAP_URL_PATH,
+				HTMLScanReport:    opts.OpenScapHTML,
+				HTMLScanReportURL: OPENSCAP_REPORT_URL_PATH,
+				AuthToken:         opts.AuthToken,
+				Chroot:            opts.Chroot,
+			}
+			inspector.imageServer = apiserver.NewWebdavImageServer(imageServerOpts)
+		} else {
+			inspector.imageServer = opts.ImageServer
 		}
-		inspector.imageServer = apiserver.NewWebdavImageServer(imageServerOpts)
+	}
+
+	if nil == opts.ImageAcquirer {
+		inspector.ImageAcquirer = getAcquirer(&opts)
+	} else {
+		inspector.ImageAcquirer = opts.ImageAcquirer
 	}
 
 	inspector.scanOutputs.ScanResults = iiapi.ScanResult{
@@ -118,16 +139,6 @@ func NewDefaultImageInspector(opts iicmd.ImageInspectorOptions) ImageInspector {
 	}
 
 	return inspector
-}
-
-type DockerRuntimeClient interface {
-	InspectImage(name string) (*docker.Image, error)
-	ContainerChanges(id string) ([]docker.Change, error)
-	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
-	CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error)
-	RemoveContainer(opts docker.RemoveContainerOptions) error
-	InspectContainer(id string) (*docker.Container, error)
-	DownloadFromContainer(id string, opts docker.DownloadFromContainerOptions) error
 }
 
 // Inspect inspects and serves the image based on the ImageInspectorOptions.
@@ -148,15 +159,21 @@ func (i *defaultImageInspector) Inspect() error {
 func (i *defaultImageInspector) acquireAndScan() error {
 	var (
 		scanner iiapi.Scanner
+		err     error
+		source  string
 
 		filterFn iiapi.FilesFilter
 	)
 
 	ctx := context.Background()
 
-	client, err := docker.NewClient(i.opts.URI)
+	if len(i.opts.Container) != 0 {
+		source = i.opts.Container
+	} else {
+		source = i.opts.Image
+	}
+	err, filterFn = i.acquireImage(source)
 	if err != nil {
-		i.meta.ImageAcquireError = err.Error()
 		return err
 	} else {
 		err, filterFn = i.acquireImage(client)
@@ -164,12 +181,44 @@ func (i *defaultImageInspector) acquireAndScan() error {
 			i.meta.ImageAcquireError = err.Error()
 			return err
 		}
+
+		i.meta.Image = *meta.Image
+		scanResults.ImageID = meta.Image.ID
+		scanResults.ContainerID = meta.Container.ID
+
+		var filterInclude map[string]struct{}
+
+		if i.opts.ScanContainerChanges {
+			filterInclude, err = i.getContainerChanges(client, meta)
+		}
+
+		i.opts.DstPath = fmt.Sprintf("/host/proc/%d/root/", meta.Container.State.Pid)
+
+		excludePrefixes := []string{
+			i.opts.DstPath + "proc",
+			i.opts.DstPath + "sys",
+		}
+
+		filterFn = func(path string, fileInfo os.FileInfo) bool {
+			if filterInclude != nil {
+				if _, ok := filterInclude[path]; !ok {
+					return false
+				}
+			}
+
+			for _, prefix := range excludePrefixes {
+				if strings.HasPrefix(path, prefix) {
+					return false
+				}
+			}
+
+			return true
+		}
 	}
 
 	switch i.opts.ScanType {
 	case "openscap":
-		var err error
-		if i.opts.ScanResultsDir, err = createOutputDir(i.opts.ScanResultsDir, "image-inspector-scan-results-"); err != nil {
+		if i.opts.ScanResultsDir, err = util.CreateOutputDir(i.opts.ScanResultsDir, "image-inspector-scan-results-"); err != nil {
 			return err
 		}
 		var (
@@ -190,7 +239,7 @@ func (i *defaultImageInspector) acquireAndScan() error {
 		}
 
 	case "clamav":
-		scanner, err := clamav.NewScanner(i.opts.ClamSocket)
+		scanner, err = clamav.NewScanner(i.opts.ClamSocket)
 		if err != nil {
 			return fmt.Errorf("failed to initialize clamav scanner: %v", err)
 		}
@@ -243,389 +292,15 @@ func (i *defaultImageInspector) postResults(scanResults iiapi.ScanResult) error 
 	if err != nil {
 		return err
 	}
+        defer resp.Body.Close()
 	log.Printf("DEBUG: Success: %v", resp)
 	return nil
 }
 
-// aggregateBytesAndReport sums the numbers recieved from its input channel
-// bytesChan and prints them to the log every PULL_LOG_INTERVAL_SEC seconds.
-// It will exit after bytesChan is closed.
-func aggregateBytesAndReport(bytesChan chan int) {
-	var bytesDownloaded int = 0
-	ticker := time.NewTicker(PULL_LOG_INTERVAL_SEC)
-	defer ticker.Stop()
-	for {
-		select {
-		case bytes, open := <-bytesChan:
-			if !open {
-				log.Printf("Finished Downloading Image (%dKb downloaded)", bytesDownloaded/1024)
-				return
-			}
-			bytesDownloaded += bytes
-		case <-ticker.C:
-			log.Printf("Downloading Image (%dKb downloaded)", bytesDownloaded/1024)
-		}
-	}
-}
-
-// decodeDockerResponse will parse the docker pull messages received
-// from reader. It will start aggregateBytesAndReport with bytesChan
-// and will push the difference of bytes downloaded to bytesChan.
-// Errors encountered during parsing are reported to parsedErrors channel.
-// After reader is closed it will send nil on parsedErrors, close bytesChan and send true on finished.
-func decodeDockerResponse(parsedErrors chan error, reader io.Reader, finished chan bool) {
-	type progressDetailType struct {
-		Current, Total int
-	}
-	type pullMessage struct {
-		Status, Id     string
-		ProgressDetail progressDetailType
-		Error          string
-	}
-	bytesChan := make(chan int, 100)
-	defer func() { close(bytesChan) }()           // Closing the channel to end the other routine
-	layersBytesDownloaded := make(map[string]int) // bytes downloaded per layer
-	dec := json.NewDecoder(reader)                // decoder for the json messages
-
-	var startedDownloading = false
-	for {
-		var v pullMessage
-		if err := dec.Decode(&v); err != nil {
-			if err != io.ErrClosedPipe && err != io.EOF {
-				log.Printf("Error decoding json: %v", err)
-				parsedErrors <- fmt.Errorf("Error decoding json: %v", err)
-			} else {
-				parsedErrors <- nil
-			}
-			break
-		}
-		// decoding
-		if v.Error != "" {
-			parsedErrors <- fmt.Errorf(v.Error)
-			break
-		}
-		if v.Status == "Downloading" {
-			if !startedDownloading {
-				go aggregateBytesAndReport(bytesChan)
-				startedDownloading = true
-			}
-			bytes := v.ProgressDetail.Current
-			last, existed := layersBytesDownloaded[v.Id]
-			if !existed {
-				last = 0
-			}
-			layersBytesDownloaded[v.Id] = bytes
-			bytesChan <- (bytes - last)
-		}
-	}
-
-	finished <- true
-}
-
-func (i *defaultImageInspector) getContainerMeta(client DockerRuntimeClient) (*containerMeta, error) {
-	var err error
-	result := &containerMeta{}
-
-	result.Container, err = client.InspectContainer(i.opts.Container)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to get docker container information: %v", err)
-	}
-
-	result.Image, err = client.InspectImage(result.Container.Image)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to get docker image information: %v", err)
-	}
-
-	return result, nil
-}
-
-func (i *defaultImageInspector) getContainerChanges(client DockerRuntimeClient, meta *containerMeta) (map[string]struct{}, error) {
-	rootPath := i.opts.DstPath
-
-	containerChanges, err := client.ContainerChanges(i.opts.Container)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to get docker container changes: %v", err)
-	}
-
-	// We don't want to scan anything if the containerChanges is empty.
-	filter := make(map[string]struct{})
-
-	for _, change := range containerChanges {
-		switch change.Kind {
-		case docker.ChangeAdd, docker.ChangeModify:
-			filter[rootPath+change.Path] = struct{}{}
-		}
-	}
-
-	return filter, nil
-}
-
-// dockerPullImage pulls the inspected image through the docker socket
-// using the given client.
-// It will try to use all detected authentication methods and will fail
-// only if all of them failed.
-func (i *defaultImageInspector) pullImage(client DockerRuntimeClient) error {
-	log.Printf("Pulling image %s", i.opts.Image)
-
-	var imagePullAuths *docker.AuthConfigurations
-	var authCfgErr error
-	if imagePullAuths, authCfgErr = i.getAuthConfigs(); authCfgErr != nil {
-		return authCfgErr
-	}
-
-	// Try all the possible auth's from the config file
-	var err error
-	for name, auth := range imagePullAuths.Configs {
-		parsedErrors := make(chan error, 100)
-		finished := make(chan bool, 1)
-
-		defer func() {
-			<-finished
-			close(finished)
-			close(parsedErrors)
-		}()
-
-		go func() {
-			reader, writer := io.Pipe()
-			defer writer.Close()
-			defer reader.Close()
-			imagePullOption := docker.PullImageOptions{
-				Repository:    i.opts.Image,
-				OutputStream:  writer,
-				RawJSONStream: true,
-			}
-			go decodeDockerResponse(parsedErrors, reader, finished)
-
-			if err = client.PullImage(imagePullOption, auth); err != nil {
-				parsedErrors <- err
-			}
-		}()
-
-		if parsedError := <-parsedErrors; parsedError != nil {
-			log.Printf("Pulling image with authentication %s failed: %v", name, parsedError)
-		} else {
-			return nil
-		}
-	}
-	return fmt.Errorf("Unable to pull docker image: %v", err)
-}
-
-// extractImageFromContainer creates a docker container based on the option's image with containerName.
-// It will then insepct the container and image and then attempt to extract the image to
-// option's destination path.  If the destination path is empty it will write to a temp directory
-// and update the option's destination path with a /var/tmp directory.  /var/tmp is used to
-// try and ensure it is a non-in-memory tmpfs.
-func (i *defaultImageInspector) createAndExtractImage(client DockerRuntimeClient, containerName string) (*docker.Image, error) {
-	container, err := client.CreateContainer(docker.CreateContainerOptions{
-		Name: containerName,
-		Config: &docker.Config{
-			Image: i.opts.Image,
-			// For security purpose we don't define any entrypoint and command
-			Entrypoint: []string{""},
-			Cmd:        []string{""},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("creating docker container: %v\n", err)
-	}
-
-	// delete the container when we are done extracting it
-	defer func() {
-		client.RemoveContainer(docker.RemoveContainerOptions{
-			ID: container.ID,
-		})
-	}()
-
-	containerMetadata, err := client.InspectContainer(container.ID)
-	if err != nil {
-		return nil, fmt.Errorf("getting docker container information: %v\n", err)
-	}
-
-	imageMetadata, err := client.InspectImage(containerMetadata.Image)
-	if err != nil {
-		return imageMetadata, fmt.Errorf("getting docker image information: %v\n", err)
-	}
-
-	if i.opts.DstPath, err = createOutputDir(i.opts.DstPath, "image-inspector-"); err != nil {
-		return imageMetadata, fmt.Errorf("creating output dir: %v", err)
-	}
-
-	reader, writer := io.Pipe()
-	// handle closing the reader/writer in the method that creates them
-	defer writer.Close()
-	defer reader.Close()
-
-	log.Printf("Extracting image %s to %s", i.opts.Image, i.opts.DstPath)
-
-	// start the copy function first which will block after the first write while waiting for
-	// the reader to read.
-	errorChannel := make(chan error)
-	go func() {
-		errorChannel <- client.DownloadFromContainer(
-			container.ID,
-			docker.DownloadFromContainerOptions{
-				OutputStream: writer,
-				Path:         "/",
-			})
-	}()
-
-	// block on handling the reads here so we ensure both the write and the reader are finished
-	// (read waits until an EOF or error occurs).
-	if err := util.ExtractLayerTar(reader, i.opts.DstPath); err != nil {
-		return nil, err
-	}
-
-	// capture any error from the copy, ensures both the handleTarStream and DownloadFromContainer
-	// are done.
-	err = <-errorChannel
-	if err != nil {
-		return imageMetadata, fmt.Errorf("extracting container: %v\n", err)
-	}
-
-	return imageMetadata, nil
-}
-
-func generateRandomName() (string, error) {
-	n, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
-	if err != nil {
-		return "", fmt.Errorf("generating random container name: %v\n", err)
-	}
-	return fmt.Sprintf("image-inspector-%016x", n), nil
-}
-
-func appendDockerCfgConfigs(dockercfg string, cfgs *docker.AuthConfigurations) error {
-	var imagePullAuths *docker.AuthConfigurations
-	reader, err := os.Open(dockercfg)
-	if err != nil {
-		return fmt.Errorf("opening docker config file: %v\n", err)
-	}
-	defer reader.Close()
-	if imagePullAuths, err = docker.NewAuthConfigurations(reader); err != nil {
-		return fmt.Errorf("parsing docker config file: %v\n", err)
-	}
-	if len(imagePullAuths.Configs) == 0 {
-		return fmt.Errorf("No auths were found in the given dockercfg file\n")
-	}
-	for name, ac := range imagePullAuths.Configs {
-		cfgs.Configs[fmt.Sprintf("%s/%s", dockercfg, name)] = ac
-	}
-	return nil
-}
-
-func (i *defaultImageInspector) getAuthConfigs() (*docker.AuthConfigurations, error) {
-	imagePullAuths := &docker.AuthConfigurations{Configs: map[string]docker.AuthConfiguration{"Default Empty Authentication": {}}}
-	if len(i.opts.DockerCfg.Values) > 0 {
-		for _, dcfgFile := range i.opts.DockerCfg.Values {
-			if err := appendDockerCfgConfigs(dcfgFile, imagePullAuths); err != nil {
-				log.Printf("WARNING: Unable to read docker configuration from %s. Error: %v", dcfgFile, err)
-			}
-		}
-	}
-
-	if i.opts.Username != "" {
-		token, err := ioutil.ReadFile(i.opts.PasswordFile)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read password file: %v\n", err)
-		}
-		imagePullAuths = &docker.AuthConfigurations{Configs: map[string]docker.AuthConfiguration{"": {Username: i.opts.Username, Password: string(token)}}}
-	}
-
-	return imagePullAuths, nil
-}
-
-func createOutputDir(dirName string, tempName string) (string, error) {
-	if len(dirName) > 0 {
-		err := osMkdir(dirName, 0755)
-		if err != nil {
-			if !os.IsExist(err) {
-				return "", fmt.Errorf("creating destination path: %v\n", err)
-			}
-		}
-	} else {
-		// forcing to use /var/tmp because often it's not an in-memory tmpfs
-		var err error
-		dirName, err = ioutilTempDir("/var/tmp", tempName)
-		if err != nil {
-			return "", fmt.Errorf("creating temporary path: %v\n", err)
-		}
-	}
-	return dirName, nil
-}
-
 // acquireImage returns error and iiapi.FilesFilter for this image.
-func (i *defaultImageInspector) acquireImage(client DockerRuntimeClient) (error, iiapi.FilesFilter) {
+func (i *defaultImageInspector) acquireImage(source string) (error, iiapi.FilesFilter) {
+	var filterFn iiapi.FilesFilter
 	var err error
-	if len(i.opts.Container) == 0 {
-		imageMetaBefore, inspectErrBefore := client.InspectImage(i.opts.Image)
-		if i.opts.PullPolicy == iiapi.PullNever && inspectErrBefore != nil {
-			return fmt.Errorf("Image %s is not available and pull-policy %s doesn't allow pulling",
-				i.opts.Image, i.opts.PullPolicy), nil
-		}
-
-		if i.opts.PullPolicy == iiapi.PullAlways ||
-			(i.opts.PullPolicy == iiapi.PullIfNotPresent && inspectErrBefore != nil) {
-			if err = i.pullImage(client); err != nil {
-				return err, nil
-			}
-		}
-
-		imageMetaAfter, inspectErrAfter := client.InspectImage(i.opts.Image)
-		if inspectErrBefore == nil && inspectErrAfter == nil &&
-			imageMetaBefore.ID == imageMetaAfter.ID {
-			log.Printf("Image %s was already available", i.opts.Image)
-		}
-
-		randomName, err := generateRandomName()
-		if err != nil {
-			return err, nil
-		}
-
-		imageMetadata, err := i.createAndExtractImage(client, randomName)
-		if err != nil {
-			return err, nil
-		}
-		i.meta.Image = *imageMetadata
-
-		return nil, nil
-	} else {
-		meta, err := i.getContainerMeta(client)
-		if err != nil {
-			return err, nil
-		}
-		i.meta.Image = *meta.Image
-		i.scanOutputs.ScanResults.ContainerID = meta.Container.ID
-
-		var filterInclude map[string]struct{}
-
-		if i.opts.ScanContainerChanges {
-			filterInclude, err = i.getContainerChanges(client, meta)
-			if err != nil {
-				return err, nil
-			}
-		}
-
-		i.opts.DstPath = fmt.Sprintf("/proc/%d/root/", meta.Container.State.Pid)
-
-		excludePrefixes := []string{
-			i.opts.DstPath + "proc",
-			i.opts.DstPath + "sys",
-		}
-
-		filterFn := func(path string, fileInfo os.FileInfo) bool {
-			if filterInclude != nil {
-				if _, ok := filterInclude[path]; !ok {
-					return false
-				}
-			}
-
-			for _, prefix := range excludePrefixes {
-				if strings.HasPrefix(path, prefix) {
-					return false
-				}
-			}
-
-			return true
-		}
-		return nil, filterFn
-	}
+	i.opts.DstPath, i.meta.Image, i.scanOutputs.ScanResults, filterFn, err = i.ImageAcquirer.Acquire(source)
+	return err, filterFn
 }

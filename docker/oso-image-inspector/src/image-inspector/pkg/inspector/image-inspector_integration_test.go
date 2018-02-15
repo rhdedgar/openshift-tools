@@ -15,7 +15,7 @@ import (
 	. "github.com/openshift/image-inspector/pkg/inspector"
 )
 
-var _ = Describe("ImageInspector", func() {
+var _ = Describe("ImageInspector Integration", func() {
 	var (
 		ii           ImageInspector
 		opts         *iicmd.ImageInspectorOptions
@@ -28,7 +28,7 @@ var _ = Describe("ImageInspector", func() {
 	)
 	//note: no expects in this block
 	//we just begin the http server here
-	BeforeSuite(func() {
+	BeforeEach(func() {
 		var err error
 		opts = iicmd.NewDefaultImageInspectorOptions()
 		opts.Serve = serve
@@ -46,19 +46,17 @@ var _ = Describe("ImageInspector", func() {
 			}
 		}()
 		//allow 5 minutes to pull image
-		if err := waitForImage(opts.DockerSocket, opts.Image, time.Minute*5); err != nil {
+		if err := waitForImage(opts.URI, opts.Image, time.Minute*5); err != nil {
 			panic(err)
 		}
 		//allow 40s to start serving http
-		if err := waitForServer(opts.Serve, time.Second*60); err != nil {
+		if err := waitForServer(opts.Serve, time.Second*40); err != nil {
 			panic(err)
 		}
 	})
-
 	AfterSuite(func() {
 		os.RemoveAll(opts.DstPath)
 	})
-
 	Describe(".Inspect()", func() {
 
 		paths := []string{
