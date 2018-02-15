@@ -72,14 +72,17 @@ type defaultImageInspector struct {
 
 func getAcquirer(opts *iicmd.ImageInspectorOptions) iiapi.ImageAcquirer {
 	if len(opts.Container) != 0 {
-		return iacq.NewDockerContainerImageAcquirer(opts.URI, opts.ScanContainerChanges)
+		return iacq.NewDockerContainerImageAcquirer(opts.DockerSocket, opts.ScanContainerChanges)
 	}
 	authOpts := iacq.AuthsOptions{
 		DockerCfg:    opts.DockerCfg,
 		Username:     opts.Username,
 		PasswordFile: opts.PasswordFile,
 	}
-	return iacq.NewDockerImageAcquirer(opts.URI, opts.DstPath, opts.PullPolicy, authOpts)
+	if opts.UseDockerSocket {
+		return iacq.NewDockerImageAcquirer(opts.DockerSocket, opts.DstPath, opts.PullPolicy, authOpts)
+	}
+	return iacq.NewContainerLibImageAcquirer(opts.DstPath, opts.RegistryCertDir, authOpts)
 }
 
 // NewInspectorMetadata returns a new InspectorMetadata out of *docker.Image
@@ -175,45 +178,6 @@ func (i *defaultImageInspector) acquireAndScan() error {
 	err, filterFn = i.acquireImage(source)
 	if err != nil {
 		return err
-	} else {
-		err, filterFn = i.acquireImage(client)
-		if err != nil {
-			i.meta.ImageAcquireError = err.Error()
-			return err
-		}
-
-		i.meta.Image = *meta.Image
-		scanResults.ImageID = meta.Image.ID
-		scanResults.ContainerID = meta.Container.ID
-
-		var filterInclude map[string]struct{}
-
-		if i.opts.ScanContainerChanges {
-			filterInclude, err = i.getContainerChanges(client, meta)
-		}
-
-		i.opts.DstPath = fmt.Sprintf("/host/proc/%d/root/", meta.Container.State.Pid)
-
-		excludePrefixes := []string{
-			i.opts.DstPath + "proc",
-			i.opts.DstPath + "sys",
-		}
-
-		filterFn = func(path string, fileInfo os.FileInfo) bool {
-			if filterInclude != nil {
-				if _, ok := filterInclude[path]; !ok {
-					return false
-				}
-			}
-
-			for _, prefix := range excludePrefixes {
-				if strings.HasPrefix(path, prefix) {
-					return false
-				}
-			}
-
-			return true
-		}
 	}
 
 	switch i.opts.ScanType {
@@ -292,7 +256,6 @@ func (i *defaultImageInspector) postResults(scanResults iiapi.ScanResult) error 
 	if err != nil {
 		return err
 	}
-        defer resp.Body.Close()
 	log.Printf("DEBUG: Success: %v", resp)
 	return nil
 }
