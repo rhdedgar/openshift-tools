@@ -15,6 +15,7 @@ import (
 func main() {
 	inspectorOptions := iicmd.NewDefaultImageInspectorOptions()
 
+        flag.StringVar(&inspectorOptions.URI, "docker", inspectorOptions.URI, "Daemon socket to connect to")
 	flag.BoolVar(&inspectorOptions.UseDockerSocket, "use-docker-socket", inspectorOptions.UseDockerSocket, "Use docker daemon to handle image pulls (requires docker-socket)")
 	flag.StringVar(&inspectorOptions.DockerSocket, "docker-socket", inspectorOptions.DockerSocket, "Daemon socket to connect to")
 	flag.StringVar(&inspectorOptions.Image, "image", inspectorOptions.Image, "Docker image to inspect (cannot be used with the container option)")

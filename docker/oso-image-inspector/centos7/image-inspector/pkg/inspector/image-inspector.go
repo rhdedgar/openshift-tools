@@ -154,7 +154,7 @@ func (i *defaultImageInspector) acquireAndScan() error {
 
 	ctx := context.Background()
 
-	client, err := docker.NewClient(i.opts.uri)
+	client, err := docker.NewClient(i.opts.URI)
 	if err != nil {
 		i.meta.ImageAcquireError = err.Error()
 		return err
