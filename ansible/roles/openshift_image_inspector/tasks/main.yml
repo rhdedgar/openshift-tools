@@ -32,17 +32,15 @@
     namespace: "{{ oii_namespace }}" 
 
 - name: set service account permissions
-  oadm_policy_user:
-    namespace: "{{ oii_namespace }}"
-    user: "system:serviceaccount:{{ oii_namespace }}:imageinspector"
-    resource_kind: "{{ item.r_kind }}" 
-    resource_name: "{{ item.r_name }}"
-    state: present
+  command: "oc adm policy {{ item.r_kind }} {{ item.r_name }} system:serviceaccount:{{ oii_namespace }}:imageinspector"
+  delegate_to: "{{ cluster_master }}"
+  run_once: true
+  ignore_errors: true
   with_items:
-    - r_kind: cluster-role
-      r_name: cluster-reader
-    - r_kind: scc
-      r_name: privileged
+  - r_kind: add-cluster-role-to-user
+    r_name: cluster-reader
+  - r_kind: add-scc-to-user
+    r_name: privileged
 
   # running as command until oc_secret supports config file image secrets
 - name: "Create image pull secret"
