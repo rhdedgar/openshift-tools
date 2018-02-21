@@ -3,7 +3,6 @@
   gather_facts: no
   vars_files:
   - /root/default_vars.yml
-  - /host/etc/origin/node/node-config.yaml
 
   vars:
     scanning_cron:
@@ -11,43 +10,9 @@
       minute: 1
       hour: 1
       day: 1
-      job: "/usr/local/bin/scan_images &>/dev/null"
+      job: "/usr/local/bin/duplicate_accounts_report.sh &>/dev/null"
 
   tasks:
-  - name: "Create custom scan report directory for image-inspector"
-    file:
-      path: "{{ item.ii_name }}"
-      state: "{{ item.ii_state}}"
-      recurse: "{{ item.ii_recurse }}"
-      mode: 0755
-    with_items:
-    - ii_name: /var/log/clam
-      ii_state: directory
-      ii_recurse: yes
-    - ii_name: /etc/openshift_tools
-      ii_state: directory
-      ii_recurse: yes
-    - ii_name: /etc/origin/node
-      ii_state: directory
-      ii_recurse: yes
-    - ii_name: /etc/openshift_tools/scanreport_config.yml
-      ii_state: touch
-      ii_recurse: no
-    - ii_name: /etc/origin/node/node-config.yaml
-      ii_state: touch
-      ii_recurse: no
-
-  - name: Make node name accessible
-    set_fact:
-      temp_name: "{{ kubeletArguments['node-labels'] }}"
-
-  - name: populate templated config file
-    copy:
-      content: |
-        node_hostname: {{ temp_name[4].split('=')[1] }}
-        cluster_name: {{ temp_name[4].split('=')[1].split('-node')[0] }}
-      dest: /etc/openshift_tools/scanreport_config.yml
-
   - name: Setup Cron
     cron:
       name: "{{ item.name }}"

@@ -11,7 +11,9 @@ ADD root/ /root/
 
 RUN yum install -y python2-boto3 \
                    python-requests \
-                   rh-mysql57 \
+                   # rh-mysql57 \
+                   python34 \
+                   python34-mysql \
                    python2-botocore && \
     yum clean all
 
