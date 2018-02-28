@@ -11,7 +11,7 @@ ADD root/ /root/
 
 RUN yum install -y python2-boto3 \
                    python-requests \
-                   # rh-mysql57 \
+                   MySQL-python \
                    python34 \
                    python34-mysql \
                    python2-botocore && \
@@ -19,10 +19,7 @@ RUN yum install -y python2-boto3 \
 
 ADD scripts/ /usr/local/bin/
 
-EXPOSE 8080
-
-# run as root user
-USER 0
+RUN ln -s /secrets/mysql_query /usr/local/bin/mysql_query
 
 # Start processes
 CMD /usr/local/bin/start.sh

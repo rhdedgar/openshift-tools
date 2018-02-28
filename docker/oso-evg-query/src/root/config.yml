@@ -4,23 +4,14 @@
   vars_files:
   - /root/default_vars.yml
 
-  vars:
-    scanning_cron:
-    - name: cron_scan_images
-      minute: 1
-      hour: 1
-      day: 1
-      job: "/usr/local/bin/duplicate_accounts_report.sh &>/dev/null"
-
   tasks:
-  - name: Setup Cron
-    cron:
-      name: "{{ item.name }}"
-      job: "{{ item.job }}"
-      minute: "{{ item.minute | default('*', True) }}"
-      hour: "{{ item.hour | default('*', True) }}"
-      day: "{{ item.day | default('*', True) }}"
-      month: "{{ item.month | default('*', True) }}"
-      weekday: "{{ item.weekday | default('*', True) }}"
+  - name: "Create custom report directory"
+    file:
+      path: "{{ item.ii_name }}"
+      state: "{{ item.ii_state}}"
+      recurse: "{{ item.ii_recurse }}"
+      mode: 0755
     with_items:
-    - "{{ scanning_cron }}"
+    - ii_name: /var/log/reports
+      ii_state: directory
+      ii_recurse: yes
