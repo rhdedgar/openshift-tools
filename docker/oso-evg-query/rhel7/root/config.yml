@@ -5,5 +5,13 @@
   - /root/default_vars.yml
 
   tasks:
-  - name: Placeholder task
-    debug: msg="This task does nothing"
+  - name: "Copy query tool to where unprivileged users can use from their path"
+    copy:
+      src: "{{ item.eq_src }}"
+      state: "{{ item.eq_dest}}"
+      owner: root
+      group: root
+      mode: 0777
+    with_items:
+    - eq_src: /secret/mysql_query
+      eq_dest: /usr/local/bin/mysql_query
