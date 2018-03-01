@@ -24,6 +24,7 @@ RUN yum install -y python2-boto3 \
 ADD scripts/ /usr/local/bin/
 
 RUN mkdir -p /var/log/reports && \
+    ln -s /secrets/mysql_query /usr/local/bin/mysql_query
     chmod -R g+rwX /etc/passwd /etc/group /var/log
 
 # Start processes
