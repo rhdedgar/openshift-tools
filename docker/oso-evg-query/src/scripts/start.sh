@@ -12,12 +12,13 @@ if [ "$OO_PAUSE_ON_START" = "true" ] ; then
   done
 fi
 
-echo "Running config playbook"
-ansible-playbook /root/config.yml
-
 echo This container hosts the following applications:
 echo
-echo 
+echo '/usr/local/bin/mysql_query'
 echo
-echo '/usr/local/bin/'
-/usr/local/bin/ops-run-in-loop 604800 /usr/bin/clamav-unofficial-sigs.sh &>/dev/null 
+echo '/usr/local/bin/weekly_duplicate_accounts_report.sh'
+echo
+echo '/usr/local/bin/check_reporting.sh'
+echo
+echo 'checking on reporting functionality once a week' 
+/usr/local/bin/ops-run-in-loop 36288000 /usr/local/bin/check_reporting.sh &>/dev/null 
