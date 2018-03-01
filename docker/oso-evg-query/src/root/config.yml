@@ -9,8 +9,6 @@
     copy:
       src: "{{ item.eq_src }}"
       dest: "{{ item.eq_dest}}"
-      owner: root
-      group: root
       mode: 0777
     with_items:
     - eq_src: /secrets/mysql_query
