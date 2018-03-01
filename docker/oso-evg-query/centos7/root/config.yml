@@ -5,13 +5,5 @@
   - /root/default_vars.yml
 
   tasks:
-  - name: "Create custom report directory"
-    file:
-      path: "{{ item.ii_name }}"
-      state: "{{ item.ii_state}}"
-      recurse: "{{ item.ii_recurse }}"
-      mode: 0755
-    with_items:
-    - ii_name: /var/log/reports
-      ii_state: directory
-      ii_recurse: yes
+  - name: Placeholder task
+    debug: msg="This task does nothing"
