@@ -19,7 +19,8 @@ RUN yum install -y python2-boto3 \
 
 ADD scripts/ /usr/local/bin/
 
-RUN mkdir -p /var/log/reports
+RUN mkdir -p /var/log/reports && \
+    chmod -R g+rwX /etc/passwd /etc/group /var/log
 
 # Start processes
 CMD /usr/local/bin/start.sh
