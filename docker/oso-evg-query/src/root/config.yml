@@ -8,7 +8,7 @@
   - name: "Copy query tool to where unprivileged users can use from their path"
     copy:
       src: "{{ item.eq_src }}"
-      state: "{{ item.eq_dest}}"
+      dest: "{{ item.eq_dest}}"
       owner: root
       group: root
       mode: 0777
