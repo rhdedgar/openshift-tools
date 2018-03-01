@@ -12,9 +12,11 @@ if [ "$OO_PAUSE_ON_START" = "true" ] ; then
   done
 fi
 
+cp /secrets/mysql_query /root/mysql_query
+
 echo This container hosts the following applications:
 echo
-echo '/usr/local/bin/mysql_query'
+echo '/root/mysql_query'
 echo
 echo '/usr/local/bin/weekly_duplicate_accounts_report.sh'
 echo

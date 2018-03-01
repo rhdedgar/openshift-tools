@@ -19,7 +19,7 @@ RUN yum install -y python2-boto3 \
 
 ADD scripts/ /usr/local/bin/
 
-RUN cp /secrets/mysql_query /usr/local/bin/mysql_query && mkdir -p /var/log/reports
+RUN mkdir -p /var/log/reports
 
 # Start processes
 CMD /usr/local/bin/start.sh
