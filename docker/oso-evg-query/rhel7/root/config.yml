@@ -13,5 +13,5 @@
       group: root
       mode: 0777
     with_items:
-    - eq_src: /secret/mysql_query
+    - eq_src: /secrets/mysql_query
       eq_dest: /usr/local/bin/mysql_query
