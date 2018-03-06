@@ -8,3 +8,5 @@ ansible-playbook /root/config.yml
 
 echo "Running weekly duplicate accounts report"
 /usr/local/bin/weekly-duplicate-accounts-report.sh
+
+exit 0
