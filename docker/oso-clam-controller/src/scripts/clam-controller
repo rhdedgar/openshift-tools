@@ -11,6 +11,7 @@ import os
 import socket
 import subprocess
 import re
+import requests
 import yaml
 
 #from Queue import Queue
@@ -36,7 +37,7 @@ class PlegEventListener(object):
 #        scan_q.put(container_id)
 #        #self.process_container(container_id)
 
-
+    # pylint: disable=too-many-locals
     def gather_images(self):
         """ Gather and filter registry images. """
 
@@ -55,6 +56,7 @@ class PlegEventListener(object):
 
         rh_con_reg = r'(^registry.connect.redhat.com)|'
         rh_acc_reg = r'(^registry.access.redhat.com)|'
+        rh_io_reg = r'(^registry.redhat.io)|'
         reg_aws = r'(^registry.reg-aws.openshift.com)'
         priv_ns = r'(^' + reg_add + r'\/openshift-)'
         heal_ns = r'(^' + reg_add + \
@@ -71,7 +73,7 @@ class PlegEventListener(object):
             im_id = imname.split()[0]
             im_add = imname.split()[1]
             is_health = re.match(heal_ns, im_add, re.I)
-            is_rh = re.match(rh_con_reg + rh_acc_reg + reg_aws, im_add, re.I)
+            is_rh = re.match(rh_con_reg + rh_acc_reg + rh_io_reg + reg_aws, im_add, re.I)
             is_ops = re.match(priv_ns, im_add, re.I)
 
             if not is_health and not is_rh and not is_ops:
@@ -126,33 +128,30 @@ class PlegEventListener(object):
 
 
     @staticmethod
-    def annotate(namespace, sig_name, reserved_ns, sig_dict):
-        """ Annotate the specified user for deprovisioning. """
+    def get_api_info(config_path):
+        """ Get info about the API that can be used to call the deprovisioner
 
-        if not reserved_ns and sig_name.split()[0] in sig_dict:
+            Returns:
+                A dictionary with the address and token for the manage.openshift.com API.
+         """
 
-            des_proj_cmd = ['chroot', \
-                            '/host', \
-                            'oc', \
-                            'export', \
-                            'project', \
-                             namespace, \
-                            '--template='\
-                            '{{index .metadata.annotations "openshift.io/requester"}}\'' \
-                           ]
+        config_settings = {}
 
-            user_name = subprocess.check_output(des_proj_cmd).strip(b'\'').strip(b'\"')
+        if os.path.isfile(config_path):
+            with open(config_path, 'r') as log_config:
+                yaml_config = yaml.load(log_config)
 
-            anno_cmd = ['chroot', \
-                        '/host', \
-                        'oc', \
-                        'annotate', \
-                        'user',
-                        user_name, \
-                        'takedown=True', \
-                        '--overwrite'
-                       ]
-            subprocess.call(anno_cmd)
+                try:
+                    config_settings['occ_api_token'] = yaml_config['occ_api_token']
+                except KeyError:
+                    pass
+
+                try:
+                    config_settings['occ_api_url'] = yaml_config['occ_api_url']
+                except KeyError:
+                    pass
+
+        return config_settings
 
 
     @staticmethod
@@ -160,7 +159,7 @@ class PlegEventListener(object):
         """ Get the dictionary of signatures to match.
 
             Any container hosting code matched by these signatures should have
-            its user be labeled for deprovisioning as soon as they are detected.
+            its user be called for deprovisioning as soon as they are detected.
 
             Returns:
                 A dictionary containing signatures of especially disruptive code.
@@ -197,7 +196,8 @@ class PlegEventListener(object):
         return data
 
 
-    def start_serve(self, sig_dict):
+    # pylint: disable=too-many-nested-blocks
+    def start_serve(self, sig_dict, api_info):
         """ Listen on specified port for incoming clam logs. """
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -229,12 +229,16 @@ class PlegEventListener(object):
 
                     else:
                         for sig_res in rec_js['results']:
-                            sig_name = sig_res['description']
+                            sig_msg = sig_res['description']
+                            sig_name, reason_code = sig_msg.split()
+
                             pod_ns = rec_js['nameSpace'].strip('\'').strip('\"')
 
                             reserved_ns = re.match(r'(^openshift-)', pod_ns, re.I)
-                            # exclude default namespace too
-                            self.annotate(pod_ns, sig_name, reserved_ns, sig_dict)
+                            default_ns = re.match(r'(^default$)', pod_ns, re.I)
+
+                            if not reserved_ns and not default_ns and sig_name in sig_dict:
+                                self.deprovision(api_info, pod_ns, reason_code)
 
                         break
 
@@ -242,12 +246,56 @@ class PlegEventListener(object):
                 connection.close()
 
 
+    @staticmethod
+    def deprovision(api_info, pod_ns, reason_code):
+        """ Call the deprovisioner API for a full takedown. """
+
+
+        api_token = api_info['occ_api_token']
+        api_url = api_info['occ_api_url']
+
+        des_proj_cmd = ['chroot', \
+                        '/host', \
+                        'oc', \
+                        'export', \
+                        'project', \
+                         pod_ns, \
+                        '--template='\
+                        '{{index .metadata.annotations "openshift.io/requester"}}\'' \
+                       ]
+
+        user_name = subprocess.check_output(des_proj_cmd).strip(b'\'').strip(b'\"')
+
+        devtools_acc = re.match(r'(^devtools-sre$)', user_name, re.I)
+
+        if devtools_acc:
+            anno_cmd = ['chroot', \
+                        '/host', \
+                        'oc', \
+                        'annotate', \
+                        'namespace',
+                        pod_ns, \
+                        'takedown=True', \
+                        '--overwrite'
+                       ]
+            subprocess.call(anno_cmd)
+
+        else:
+            api_url += user_name + '/ban'
+            headers = {'Authorization': 'Bearer ' + api_token}
+            put_data = {'is_banned': 'true', 'takedown_code': reason_code}
+            new_req = requests.put(api_url, data=put_data, headers=headers)
+
+            print(new_req.status_code, new_req.reason)
+
+
     def main(self):
         """ Main function. """
 #        self.gather_images()
 
+        api_info = self.get_api_info('/secrets/api_config.yml')
         sig_dict = self.load_sigs()
-        self.start_serve(sig_dict)
+        self.start_serve(sig_dict, api_info)
 #        scan_q = Queue()
 #        worker = Thread(target=self.scan_worker, args=(scan_q,))
 #        worker.setDaemon(True)

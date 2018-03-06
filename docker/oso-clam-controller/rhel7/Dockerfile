@@ -16,6 +16,7 @@ RUN yum install -y python2-boto3 \
                    python34 \
                    python34-libs \
                    python34-PyYAML \
+		   python34-requests \
                    python2-botocore && \
     yum clean all
 

@@ -67,6 +67,8 @@
       data: "{{ occ_aws_config_content }}"
     - path: aws_creds.yml
       data: "{{ occ_aws_creds_content }}"
+    - path: api_config.yml
+      data: "{{ occ_api_config_content }}"
 
 - name: "Check to see if template already exists in {{ occ_namespace }}"
   oc_obj:
