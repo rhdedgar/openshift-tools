@@ -62,16 +62,19 @@ class ClamLogSrv(object):
     def send_results(rec_js, ctrl_host, ctrl_port):
         """ Used to send a string representation of a json dict to clam-controller. """
 
-        send_bytes = str(rec_js).encode("ascii")
+        try:
+            send_bytes = str(rec_js).encode("ascii")
 
-        sendsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sendsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        sendsock.connect((ctrl_host, int(ctrl_port)))
+            sendsock.connect((ctrl_host, int(ctrl_port)))
 
-        sendsock.sendall(send_bytes)
+            sendsock.sendall(send_bytes)
+        except socket.gaierror:
+            print("cannot resolve service: ", ctrl_host)
 
 
-    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-locals, too-many-statements
     def start_serve(self, hostname, hostport, logfile):
         """ Listen on specified port for incoming clam logs. """
 
