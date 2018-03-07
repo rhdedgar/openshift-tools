@@ -39,7 +39,7 @@ func (dcia *dockerContainerImageAcquirer) AcquireImageFromDockerContainer(source
 
 	var filterInclude map[string]struct{}
 
-	dstPath := fmt.Sprintf("/proc/%d/root/", meta.Container.State.Pid)
+	dstPath := fmt.Sprintf("/host/proc/%d/root/", meta.Container.State.Pid)
 
 	if dcia.ScanContainerChanges {
 		filterInclude, err = getContainerChanges(client, meta, source, dstPath)
