@@ -98,9 +98,6 @@
     kind: pods
   register: podlist
 
-- debug:
-    msg: "{{ registry_ip['stdout'] }}/{{ ocs_namespace }}"
-
 - name: "Create bc,is,ds for apps in {{ ocs_namespace }} from template"
   oc_process:
     namespace: "{{ ocs_namespace }}"
