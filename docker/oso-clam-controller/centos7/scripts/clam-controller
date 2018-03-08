@@ -215,10 +215,11 @@ class PlegEventListener(object):
                 while True:
                     # pylint: disable=no-member
                     data = connection.recv(10240)
-                    newdata = data.split(b'\r\n\r\n')[1].strip(b"'")
 
-                    print(type(newdata))
-                    print(newdata)
+                    print(type(data))
+                    print(data)
+
+                    newdata = data.split(b'\r\n\r\n')[1].strip(b"'")
 
                     conv_js = self.convert_types(newdata)
 
