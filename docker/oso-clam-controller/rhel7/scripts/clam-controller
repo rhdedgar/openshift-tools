@@ -217,6 +217,9 @@ class PlegEventListener(object):
                     data = connection.recv(10240)
                     newdata = data.split(b'\r\n\r\n')[1].strip(b"'")
 
+                    print(type(newdata))
+                    print(newdata)
+
                     conv_js = self.convert_types(newdata)
 
                     try:
