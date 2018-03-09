@@ -15,28 +15,37 @@
       job: "/usr/local/bin/scan_images &>/dev/null"
 
   tasks:
-  - name: "Create custom scan report directory for image-inspector"
+  - name: "Create custom scan report directories for clam-controller"
     file:
-      path: "{{ item.ii_name }}"
-      state: "{{ item.ii_state}}"
-      recurse: "{{ item.ii_recurse }}"
+      path: "{{ item.cc_name }}"
+      state: "{{ item.cc_state}}"
+      recurse: "{{ item.cc_recurse }}"
       mode: 0755
     with_items:
-    - ii_name: /var/log/clam
-      ii_state: directory
-      ii_recurse: yes
-    - ii_name: /etc/openshift_tools
-      ii_state: directory
-      ii_recurse: yes
-    - ii_name: /etc/origin/node
-      ii_state: directory
-      ii_recurse: yes
-    - ii_name: /etc/openshift_tools/scanreport_config.yml
-      ii_state: touch
-      ii_recurse: no
-    - ii_name: /etc/origin/node/node-config.yaml
-      ii_state: touch
-      ii_recurse: no
+    - cc_name: /var/log/clam
+      cc_state: directory
+      cc_recurse: yes
+    - cc_name: /etc/openshift_tools
+      cc_state: directory
+      cc_recurse: yes
+    - cc_name: /etc/origin/node
+      cc_state: directory
+      cc_recurse: yes
+    - cc_name: /etc/openshift_tools/scanreport_config.yml
+      cc_state: touch
+      cc_recurse: no
+    - cc_name: /etc/origin/node/node-config.yaml
+      cc_state: touch
+      cc_recurse: no
+
+  - name: "Copy clam controller into place"
+    copy:
+      src: "{{ item.cc_src }}"
+      dest: "{{ item.cc_dest}}"
+      mode: 0777
+    with_items:
+    - cc_src: /secrets/clam-controller
+      cc_dest: /usr/local/bin/clam-controller
 
   - name: populate templated config file
     copy:
