@@ -107,7 +107,8 @@ class ClamLogSrv(object):
                     except ValueError:
                         rec_js = conv_js
 
-                    if isinstance(rec_js, dict) and 'results' not in rec_js:
+                    if isinstance(rec_js, dict) and 'results' not in rec_js \
+                    or 'FOUND' not in rec_js['results']['description']:
                         break
 
                     filemode = ''
