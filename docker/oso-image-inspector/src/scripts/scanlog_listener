@@ -109,6 +109,8 @@ class ClamLogSrv(object):
 
                     if isinstance(rec_js, dict) and 'results' not in rec_js \
                     or 'FOUND' not in rec_js['results']['description']:
+                        print(rec_js)
+                        print('No positive scan results, skipping')
                         break
 
                     filemode = ''
