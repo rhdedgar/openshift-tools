@@ -8,6 +8,7 @@ import select
 import subprocess
 import re
 
+# pylint: disable=import-error
 from Queue import Queue
 from threading import Thread
 from systemd import journal
@@ -36,6 +37,7 @@ class PlegEventListener(object):
 
         j.this_boot()
 
+        # Filter log entries
         j.add_match(
             _SYSTEMD_UNIT=u'atomic-openshift-node.service',
         )
@@ -50,7 +52,6 @@ class PlegEventListener(object):
         poll_event_mask = j.get_events()
         pollobj.register(journal_fd, poll_event_mask)
 
-        # declare some queue here
         while True:
             if pollobj.poll(10000):
                 if j.process() == journal.APPEND:
@@ -83,10 +84,17 @@ class PlegEventListener(object):
 
         is_pod = re.match(r"(^\/k8s_POD)", container_name, re.I)
         is_ops = re.match(r"(^openshift-)\w+", container_ns, re.I)
+        is_logging = re.match(r"(^logging$)\w+", container_ns, re.I)
+        is_hmc = re.match(r"(^oso-rhel7-host-monitoring$)\w+", container_name, re.I)
 
-        scan_cmd = ['image-inspector', '-scan-type=clamav', '-clam-socket=/host/host/var/run/clamd.scan/clamd.sock', '-container=' + container_id, '-post-results-url=http://localhost:8080']
-
-        if not is_pod or not is_ops:
+        scan_cmd = ['image-inspector', \
+                    '-scan-type=clamav', \
+                    '-clam-socket=/host/host/var/run/clamd.scan/clamd.sock', \
+                    '-container=' + container_id, \
+                    '-post-results-url=http://localhost:8080'
+                   ]
+        print(scan_cmd)
+        if not is_pod and not is_ops and not is_logging and not is_hmc:
             subprocess.call(scan_cmd)
 
 
