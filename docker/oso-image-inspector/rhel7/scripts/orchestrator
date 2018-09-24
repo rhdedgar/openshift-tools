@@ -4,15 +4,20 @@
 """ Listen for kubernetes PLEG creation events, and launch an
     image-inspector scan for every newly created customer container. """
 
+import json
 import select
 import socket
 import subprocess
 import re
 
-# pylint: disable=import-error
+# pylint: disable=no-value-for-parameter,import-error
 from Queue import Queue
 from threading import Thread
 from systemd import journal
+
+from prometheus_client import start_http_server, Summary
+
+REQUEST_TIME = Summary('request_processing_seconds', 'Time spent processing request')
 
 
 class PlegEventListener(object):
@@ -70,22 +75,21 @@ class PlegEventListener(object):
 
 
     @staticmethod
+    @REQUEST_TIME.time()
     def process_container(container_id):
         """ Check if provided container should be scanned. """
 
         inspect_output = subprocess.check_output([\
         'chroot', \
         '/host', \
-        '/usr/bin/docker', \
+        '/usr/bin/crictl', \
         'inspect', \
-        '--format', \
-        '\'{{.Name}} \
-        {{index .Config.Labels "io.kubernetes.pod.namespace"}} \'', \
         container_id
                                                  ])
+        inspect_dict = json.loads(inspect_output)
 
-        container_name = inspect_output.split()[0]
-        container_ns = inspect_output.split()[1]
+        container_name = inspect_dict['status']['labels']['io.kubernetes.container.name']
+        container_ns = inspect_dict['status']['labels']['io.kubernetes.pod.namespace']
 
         is_pod = re.match(r"(^\/k8s_POD)", container_name, re.I)
         is_ops = re.match(r"(^openshift-)\w+", container_ns, re.I)
@@ -111,6 +115,7 @@ class PlegEventListener(object):
         worker.setDaemon(True)
         worker.start()
 
+        start_http_server(8000)
         self.catch_creates(scan_q)
 
 

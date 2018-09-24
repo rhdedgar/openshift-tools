@@ -9,7 +9,7 @@
     - name: cron_scan_pods
       minute: "15"
       hour: 13
-      job: "/usr/local/bin/cron-scan-pods.sh &>/dev/null"
+      job: "/usr/local/bin/cron-scan-pods &>/dev/null"
 
     - name: inmem_scan
       minute: "15"

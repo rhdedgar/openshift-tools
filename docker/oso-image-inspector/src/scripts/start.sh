@@ -27,9 +27,9 @@ echo '/usr/local/bin/scanlog_listener'
 echo
 echo '/usr/local/bin/check_scanning'
 echo
-echo '/usr/local/bin/cron-scan-pods.sh'
+echo '/usr/local/bin/cron-scan-pods'
 echo
-echo '/usr/local/bin/cron-in-memory-scan.sh'
+echo '/usr/local/bin/cron-in-memory-scan'
 echo
 echo '/usr/local/bin/upload_scanlogs'
 echo

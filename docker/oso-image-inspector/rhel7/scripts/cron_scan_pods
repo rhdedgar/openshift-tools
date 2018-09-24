@@ -1,0 +1,67 @@
+#!/bin/env python
+# vim: expandtab:tabstop=4:shiftwidth=4
+
+""" Launch a scan of running containers on the host, with some exclusions. """
+
+import json
+import subprocess
+import re
+
+# pylint: disable=no-value-for-parameter,import-error
+class StartScan(object):
+    """ Class to start and report scan results. """
+
+
+    @staticmethod
+    def process_container(container_id):
+        """ Check if provided container should be scanned. """
+
+        inspect_output = subprocess.check_output([\
+        'chroot', \
+        '/host', \
+        '/usr/bin/crictl', \
+        'inspect', \
+        container_id
+                                                 ])
+        inspect_dict = json.loads(inspect_output)
+
+        container_name = inspect_dict['status']['labels']['io.kubernetes.container.name']
+        container_ns = inspect_dict['status']['labels']['io.kubernetes.pod.namespace']
+
+        is_ops = re.match(r"(^openshift-)\w+", container_ns, re.I)
+        is_logging = re.match(r"(^logging$)\w+", container_ns, re.I)
+        is_hmc = re.match(r"(^monitoring$)\w+", container_name, re.I)
+
+        scan_cmd = ['image-inspector', \
+                    '-scan-type=clamav', \
+                    '-clam-socket=/host/host/var/run/clamd.scan/clamd.sock', \
+                    '-container=' + container_id, \
+                    '-post-results-url=http://localhost:8080'
+                   ]
+
+        print(scan_cmd)
+
+        if not is_ops and not is_logging and not is_hmc:
+            subprocess.call(scan_cmd)
+
+
+    def main(self):
+        """ Main function. """
+
+        crio_list = subprocess.check_output([\
+        'chroot', \
+        '/host', \
+        '/usr/bin/crictl', \
+        'ps', \
+        '-q'
+                                            ]).split('\n')
+
+        for container_id in crio_list:
+            self.process_container(container_id)
+
+        subprocess.call(['/usr/local/bin/upload_scanlogs'])
+
+
+if __name__ == '__main__':
+    SCANNER = StartScan()
+    SCANNER.main()

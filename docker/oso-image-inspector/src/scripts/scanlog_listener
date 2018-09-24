@@ -136,20 +136,22 @@ class ClamLogSrv(object):
 
                     with open(logfile, filemode) as open_file:
                         try:
-                            container_ns = self.convert_types(subprocess.check_output([\
+                            inspect_output = self.convert_types(subprocess.check_output([\
                             'chroot', \
                             '/host', \
-                            '/usr/bin/docker', \
+                            '/usr/bin/crictl', \
                             'inspect', \
-                            '--format', \
-                            '\'{{index .Config.Labels "io.kubernetes.pod.namespace"}} \
-                            {{index .Config.Labels "io.kubernetes.pod.name"}}\'', \
                             container_id
-                                                                                      ])
-                                                             ).replace('\'', '')
+                                                                                        ])
+                                                               ).replace('\'', '')
 
-                            rec_js['nameSpace'] = self.convert_types(container_ns.split()[0])
-                            rec_js['podName'] = self.convert_types(container_ns.split()[1])
+                            inspect_dict = json.loads(inspect_output)
+
+                            rec_js['nameSpace'] = self.convert_types\
+                            (inspect_dict['status']['labels']['io.kubernetes.pod.namespace'])
+
+                            rec_js['podName'] = self.convert_types\
+                            (inspect_dict['status']['labels']['io.kubernetes.pod.name'])
 
                             self.send_results(rec_js, ctrl_host, ctrl_port)
 
@@ -169,12 +171,11 @@ class ClamLogSrv(object):
                                         subprocess.check_output([\
                                         'chroot', \
                                         '/host', \
-                                        '/usr/bin/docker', \
+                                        '/usr/bin/crictl', \
                                         'inspect', \
                                         container_id
                                                                 ])
                                     )
-
                             except subprocess.CalledProcessError:
                                 print('cannot get full output')
                                 break
@@ -220,7 +221,7 @@ class ClamLogSrv(object):
         args = self.check_arguments()
 
         if args.servername and args.port and args.logfile:
-            start_http_server(8000)
+            start_http_server(8001)
             self.start_serve(args.servername, args.port, args.logfile)
 
         else:
