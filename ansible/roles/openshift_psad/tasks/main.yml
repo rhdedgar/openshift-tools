@@ -30,6 +30,12 @@
   - r_kind: add-scc-to-user
     r_name: privileged
 
+- name: "Delete the existing pull secret"
+  command: "oc delete secret dockercfgjson -n {{ opsad_namespace }}"
+  delegate_to: "{{ cluster_master }}"
+  run_once: true
+  ignore_errors: true
+
   # running as command until oc_secret supports config file image secrets
 - name: "Create image pull secret"
   command: "oc secrets new dockercfgjson .dockerconfigjson=/var/lib/origin/.docker/config.json -n {{ opsad_namespace }}"
