@@ -29,4 +29,5 @@ COPY dashboard/ /usr/local/bin/
 
 # Start processes
 #CMD ["go-wrapper", "run"]
-CMD ["/usr/local/bin/sre-dashboard"]
+#CMD ["/usr/local/bin/sre-dashboard"]
+CMD /usr/local/bin/start.sh
