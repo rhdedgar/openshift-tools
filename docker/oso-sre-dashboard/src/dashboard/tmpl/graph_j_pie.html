@@ -44,7 +44,7 @@
     };
 
     document.getElementById('dayButton').addEventListener('click', function() {
-      var host_prefix = 'https://sre-dashboard.openshift.com/graph';
+      var host_prefix = 'https://sre-dashboard.openshift.com/';
       var url = host_prefix + '/api/graph?callback=?&dateparam=day';
       $.getJSON(url, function(jsonp) {
           genGraph(jsonp);
@@ -52,7 +52,7 @@
     });
 
     document.getElementById('weekButton').addEventListener('click', function() {
-      var host_prefix = 'https://sre-dashboard.openshift.com/graph';
+      var host_prefix = 'https://sre-dashboard.openshift.com/';
       var url = host_prefix + '/api/graph?callback=?&dateparam=week';
       $.getJSON(url, function(jsonp) {
           genGraph(jsonp);
@@ -60,7 +60,7 @@
     });
 
     document.getElementById('monthButton').addEventListener('click', function() {
-      var host_prefix = 'https://sre-dashboard.openshift.com/graph';
+      var host_prefix = 'https://sre-dashboard.openshift.com/';
       var url = host_prefix + '/api/graph?callback=?&dateparam=month';
       $.getJSON(url, function(jsonp) {
           genGraph(jsonp);
@@ -68,7 +68,7 @@
     });
 
     document.getElementById('quarterButton').addEventListener('click', function() {
-      var host_prefix = 'https://sre-dashboard.openshift.com/graph';
+      var host_prefix = 'https://sre-dashboard.openshift.com/';
       var url = host_prefix + '/api/graph?callback=?&dateparam=quarter';
       $.getJSON(url, function(jsonp) {
           genGraph(jsonp);
