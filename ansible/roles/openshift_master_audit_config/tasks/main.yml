@@ -1,4 +1,11 @@
 ---
+- name: copy advanced config file into place
+  copy:
+    src: files/adv-audit.yaml
+    dest: "{{ omac_auditConfig_policyFile }}"
+    mode: 755
+  when: omac_auditConfig_policyFile is defined
+
 - name: "auditConfig.enabled"
   yedit:
     src: /etc/origin/master/master-config.yaml
@@ -22,4 +29,7 @@
     value: "{{ omac_auditConfig_maximumRetainedFiles | default('') }}"
   - key: auditConfig.maximumFileSizeMegabytes
     value: "{{ omac_auditConfig_maximumFileSizeMegabytes | default('') }}"
-
+  - key: auditConfig.policyFile
+    value: "{{ omac_auditConfig_policyFile | default('') }}"
+  - key: auditConfig.logFormat
+    value: "{{ omac_auditConfig_logFormat | default('') }}"

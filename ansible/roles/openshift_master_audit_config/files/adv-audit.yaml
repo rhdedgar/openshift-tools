@@ -1,0 +1,22 @@
+apiVersion: audit.k8s.io/v1beta1
+kind: Policy
+rules:
+
+  # Log creation and deletion events for every user/group
+  - level: Metadata
+    verbs: ["create", "delete"] 
+
+  # Exclude administrative users to save space.
+  - level: None 
+    users: ["system:node",
+            "system:admin",
+            "system:apiserver", 
+            "system:openshift-master",
+            "system:serviceaccount:openshift-*"]
+
+  # Exclude administrative groups to save space.
+  - level: None 
+    userGroups: ["system:nodes",
+                 "system:masters",
+                 "system:cluster-admins",
+                 "system:authenticated:oauth"]
