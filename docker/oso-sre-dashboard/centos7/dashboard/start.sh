@@ -18,7 +18,7 @@ echo '/usr/local/bin/sre-dashboard'
 
 if [ "$LEGO_CERT" = "true" ] ; then
   echo "running Lego to check if our certificates need to be renewed"
-  /usr/local/bin/lego --tls=":8443" --email="dedgar@redhat.com" --domains="sre-dashboard.openshift.com" --path="/cert/lego" --filename="sre-dashboard" --accept-tos --exclude="http-01" run
+  /usr/local/bin/lego --tls=":8443" --email="dedgar@redhat.com" --domains="sre-dashboard.openshift.com" --path="/cert/lego" --filename="dashboard" --accept-tos --exclude="http-01" run
   sleep 10
 fi
 
