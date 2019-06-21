@@ -59,6 +59,12 @@ objects:
             value: "http://oso-pod-logger.openshift-pod-logger.svc:8080/api/docker/log"
           - name: JOURNAL_PATH
             value: "/var/log/journal"
+          - name: SCANRESULTSDIR 
+            value: "/tmp"
+          - name: POSTRESULTURL
+            value: "http://127.0.0.1:8080"
+          - name: OUTFILE
+            value: "clamav_scan_results.log"
           image: "${NAMESPACE}/oso-${PLAT}-pleg-watcher:latest"
           imagePullPolicy: Always
           name: oso-pleg-watcher 
