@@ -65,6 +65,8 @@ objects:
             value: "http://127.0.0.1:8080"
           - name: OUTFILE
             value: "clamav_scan_results.log"
+          - name: CLAMSOCKET 
+            value: "unix:///host/host/var/run/clamd.scan/clamd.sock"
           image: "${NAMESPACE}/oso-${PLAT}-pleg-watcher:latest"
           imagePullPolicy: Always
           name: oso-pleg-watcher 
