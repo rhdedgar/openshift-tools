@@ -60,11 +60,11 @@ objects:
           - name: JOURNAL_PATH
             value: "/var/log/journal"
           - name: SCANRESULTSDIR 
-            value: "/tmp"
-          - name: POSTRESULTURL
-            value: "http://127.0.0.1:8080"
+            value: ""
+          - name: CLAM_LOG_URL 
+            value: "http://oso-pod-logger.openshift-pod-logger.svc:8080/api/clam/scanresult"
           - name: OUTFILE
-            value: "clamav_scan_results.log"
+            value: ""
           - name: CLAMSOCKET 
             value: "unix:///host/host/var/run/clamd.scan/clamd.sock"
           image: "${NAMESPACE}/oso-${PLAT}-pleg-watcher:latest"
