@@ -46,8 +46,16 @@
 
 - set_fact:
     api_dict:
-      api_token: "{{ api_token_out.stdout }}"
-      api_url: "{{ api_url_out.stdout }}"
+      oapi_token: "{{ api_token_out.stdout }}"
+      oapi_url: "{{ api_url_out.stdout }}"
+      td_api_token: "{{ opl_api_token }}"
+      td_api_url: "{{ opl_api_url }}"
+      td_api_user: "{{ opl_api_user }}" 
+      td_sig_list: "{{ opl_auto_takedown }}"
+      log_bucket_key_id: "{{ opl_scan_bucket_key_id }}"
+      log_bucket_key: "{{ opl_scan_bucket_key }}"
+      log_bucket_name: "{{ opl_s3_bucket }}"
+      log_bucket_region: "{{ opl_s3_iam_region }}"
 
 - name: copy pod logger secret
   copy:
@@ -64,13 +72,29 @@
   run_once: true
   ignore_errors: true
 
-- name: Get the address of the registry
+- name: "Get the address of the registry"
   shell: "oc get service -n default docker-registry --template={% raw %}'{{.spec.clusterIP}}:{{(index .spec.ports 0).port}}'{% endraw %}"
   register: registry_ip
   run_once: true
   when: registry_ip is not defined
 
-- name: copy pod logger template
+- name: "Get a usable cluster name"
+  shell: "oc get route -n default --template={% raw %}'{{(index .items 0).spec.host}}'{% endraw %}"
+  register: cluster_out
+  run_once: true
+  when: cluster_out is not defined
+
+- set_fact:
+    cluster_name: "{{ cluster_out }}.split('registry.')[1]"
+
+- debug:
+    msg: "{{ cluster_name }}"
+
+- name: "Create cluster name env var"
+  command: "oc set env -n {{ opl_namespace }} ds/oso-pod-logger CLUSTER_NAME={{ cluster_name }}"
+  ignore_errors: true
+
+- name: "copy pod logger template"
   copy:
     src: pod-logger.yml
     dest: "{{ tempdir }}/pod-logger.yml"
