@@ -85,7 +85,7 @@
   when: cluster_out is not defined
 
 - set_fact:
-    cluster_name: "{{ cluster_out }}.split('registry.')[1]"
+    cluster_name: "{{ cluster_out.stdout }}.split('registry.')[1]"
 
 - debug:
     msg: "{{ cluster_name }}"
