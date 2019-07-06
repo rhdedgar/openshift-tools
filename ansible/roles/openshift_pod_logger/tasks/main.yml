@@ -57,6 +57,10 @@
       log_bucket_name: "{{ opl_s3_bucket }}"
       log_bucket_region: "{{ opl_s3_iam_region }}"
 
+- name: debug api dict
+  debug:
+    msg: "{{ api_dict }}"
+
 - name: copy pod logger secret
   copy:
     content: "{{ api_dict | to_nice_json(indent=2) }}"
