@@ -8,6 +8,22 @@ RUN test "$OO_PAUSE_ON_BUILD" = "true" && while sleep 10; do true; done || :
 
 ADD scripts/ /usr/local/bin/
 
+RUN yum install -y golang \
+                   gcc \
+                   git \
+                   systemd-libs \
+                   systemd-devel && \
+    yum clean all
+
+ENV GOBIN=/bin \
+    GOPATH=/go
+
+RUN go get github.com/rhdedgar/pod-logger && \
+    cd /go/src/github.com/rhdedgar/pod-logger && \
+    go install && \
+    cd && \
+    rm -rf /go
+
 EXPOSE 8080
 
 # Start processes

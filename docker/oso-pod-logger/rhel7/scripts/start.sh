@@ -14,9 +14,9 @@ fi
 
 echo This container hosts the following applications:
 echo
-echo '/usr/local/bin/pod-logger'
+echo '/usr/bin/pod-logger'
 
 echo
 echo 'Always listen for pod logs from pleg-watcher pods.'
 echo '----------------'
-/usr/local/bin/pod-logger
+/usr/bin/pod-logger
