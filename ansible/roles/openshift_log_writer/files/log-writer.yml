@@ -30,14 +30,14 @@ objects:
   spec:
     replicas: 1
     selector:
-      deploymentconfig: oso-log-writer
+      name: oso-log-writer
     strategy:
       resources: {}
       type: Recreate
     template:
       metadata:
         labels:
-          deploymentconfig: oso-log-writer
+          name: oso-log-writer
       spec:
         containers:
         - env:
@@ -79,7 +79,7 @@ objects:
     name: oso-log-writer
     namespace: ${NAMESPACE}
     labels:
-      k8s-app: oso-log-writer
+      name: oso-log-writer
   spec:
     ports:
     - name: loglistener
@@ -87,7 +87,7 @@ objects:
       protocol: TCP
       targetPort: 8080
     selector:
-      k8s-app: oso-log-writer
+      name: oso-log-writer
 - apiVersion: "v1"
   kind: "PersistentVolumeClaim"
   metadata:
