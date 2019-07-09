@@ -25,7 +25,7 @@ objects:
     source:
       contextDir: "docker/oso-ops-base/${PLAT}"
       git:
-        ref: prod 
+        ref: pleg-retrofit   
         uri: https://github.com/rhdedgar/openshift-tools
       secrets: []
       type: Git
@@ -58,7 +58,7 @@ objects:
     source:
       contextDir: "docker/oso-pod-logger/${PLAT}"
       git:
-        ref: prod
+        ref: pleg-retrofit 
         uri: https://github.com/rhdedgar/openshift-tools
       secrets: []
       type: Git

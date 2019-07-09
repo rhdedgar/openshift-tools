@@ -8,13 +8,8 @@
     tempdir: "{{ mktemp.stdout }}"
 
 - name: "create project for {{ opleg_namespace }}"
-  oc_project:
-    name: "{{ opleg_namespace }}"
-    display_name: "{{ opleg_namespace }}"
-    description: PLEG watcher
-    node_selector: "pleg-watcher-enabled=True"
-  retries: 12
-  delay: 5
+  command: "oc adm new-project {{ opleg_namespace }} --node-selector='pleg-watcher-enabled=True'"
+  ignore_errors: true
 
 - name: "annotate {{ opleg_namespace }} project"
   command: "oc annotate ns {{ opleg_namespace }} openshift.io/node-selector=pleg-watcher-enabled=True"

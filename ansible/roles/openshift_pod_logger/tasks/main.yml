@@ -7,14 +7,9 @@
 - set_fact:
     tempdir: "{{ mktemp.stdout }}"
 
-- name: "create project for {{ opl_namespace }}"
-  oc_project:
-    name: "{{ opl_namespace }}"
-    display_name: "{{ opl_namespace }}"
-    description: Pod Logger API Server
-    node_selector: "pod-logger-enabled=True"
-  retries: 12
-  delay: 5
+- name: "create project"
+  command: "oc adm new-project {{ opl_namespace }} --node-selector='pod-logger-enabled=True'"
+  ignore_errors: true
 
 - name: "annotate {{ opl_namespace }} project"
   command: "oc annotate ns {{ opl_namespace }} openshift.io/node-selector=pod-logger-enabled=True"
@@ -57,9 +52,9 @@
       log_bucket_name: "{{ opl_s3_bucket }}"
       log_bucket_region: "{{ opl_s3_iam_region }}"
 
-- name: debug api dict
-  debug:
-    msg: "{{ api_dict }}"
+#- name: debug api dict
+#  debug:
+#    msg: "{{ api_dict }}"
 
 - name: copy pod logger secret
   copy:
@@ -89,14 +84,10 @@
   when: cluster_out is not defined
 
 - set_fact:
-    cluster_name: "{{ cluster_out.stdout }}.split('registry.')[1]"
+    cluster_name: "{{ cluster_out.stdout.split('registry.')[1] }}"
 
 - debug:
     msg: "{{ cluster_name }}"
-
-- name: "Create cluster name env var"
-  command: "oc set env -n {{ opl_namespace }} ds/oso-pod-logger CLUSTER_NAME={{ cluster_name }}"
-  ignore_errors: true
 
 - name: "copy pod logger template"
   copy:
@@ -115,16 +106,15 @@
     delete_after: true
   ignore_errors: true
 
-- name: "Create bc,is,ds for apps in {{ opl_namespace }} from template"
-  oc_process:
-    namespace: "{{ opl_namespace }}"
-    template_name: oso-pod-logger
-    content: "{{ lookup('file', 'files/pod-logger.yml') }}"
-    create: True
-    params:
-      PLAT: rhel7
-      NAMESPACE: "{{ registry_ip['stdout'] }}/{{ opl_namespace }}"
+- name: "Create bc,is,dc for apps in {{ opl_namespace }} from template"
+  shell: "oc process oso-pod-logger -n {{ opl_namespace }} | oc create -n {{ opl_namespace }} -f -"
   run_once: true
+  ignore_errors: true
+  retries: 12
+  delay: 5
+
+- name: "Create cluster name env var"
+  command: "oc set env -n {{ opl_namespace }} ds/oso-pod-logger CLUSTER_NAME={{ cluster_name }}"
   ignore_errors: true
 
 - name: Label nodes
@@ -142,7 +132,7 @@
   run_once: true
   ignore_errors: true
 
-- name: Delete temp directory
+- name: "Delete temp directory"
   file:
     name: "{{ tempdir }}"
     state: absent

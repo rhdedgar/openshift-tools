@@ -20,7 +20,7 @@ objects:
     source:
       contextDir: "docker/oso-log-writer/${PLAT}"
       git:
-        ref: podlogger
+        ref: pleg-retrofit
         uri: https://github.com/rhdedgar/openshift-tools
       secrets: []
       type: Git
@@ -114,7 +114,7 @@ objects:
         restartPolicy: Always
         securityContext: {}
         serviceAccount: apipodlogger
-        serviceAccountName: apipodlogger 
+        serviceAccountName: apipodlogger
         terminationGracePeriodSeconds: 30
         volumes:
         - name: logpv
