@@ -10,7 +10,22 @@ ADD scripts/ /usr/local/bin/
 
 ADD root/ /root/
 
-RUN mkdir -p /host/usr/bin /logs /var/log/journal
+RUN yum install -y golang \
+                   gcc \
+                   git \
+                   systemd-libs \
+                   systemd-devel && \
+    yum clean all
+
+ENV GOBIN=/bin \
+    GOPATH=/go
+
+RUN mkdir -p /host/usr/bin /logs /var/log/journal && \
+    go get github.com/rhdedgar/pod-logger && \
+    cd /go/src/github.com/rhdedgar/pod-logger && \
+    go install && \
+    cd && \
+    rm -rf /go
 
 USER 0
 

@@ -17,9 +17,9 @@ ansible-playbook /root/config.yml
 
 echo This container hosts the following applications:
 echo
-echo '/usr/local/bin/pleg-watcher'
+echo '/usr/bin/pleg-watcher'
 
 echo
 echo 'Always listen for PLEG events from sdjournal.'
 echo '----------------'
-/usr/local/bin/pleg-watcher
+/usr/bin/pleg-watcher
