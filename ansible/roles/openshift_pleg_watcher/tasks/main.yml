@@ -81,16 +81,8 @@
     kind: pods
   register: podlist
 
-- name: "Create bc,is,ds for apps in {{ opleg_namespace }} from template"
-  oc_process:
-    namespace: "{{ opleg_namespace }}"
-    template_name: oso-pleg-watcher
-    content: "{{ lookup('file', 'files/pleg-watcher.yml') }}"
-    create: True
-    params:
-      PLAT: rhel7
-      NAMESPACE: "{{ registry_ip['stdout'] }}/{{ opleg_namespace }}"
-  when: podlist['results']['results'][0]['items'] | length < 1
+- name: "Create bc,is,dc for apps in {{ opleg_namespace }} from template"
+  shell: "oc process oso-pleg-watcher -n {{ opleg_namespace }} | oc create -n {{ opleg_namespace }} -f -"
   run_once: true
   ignore_errors: true
 

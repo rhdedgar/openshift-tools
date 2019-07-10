@@ -84,7 +84,7 @@
   when: cluster_out is not defined
 
 - set_fact:
-    cluster_name: "{{ cluster_out.stdout.split('registry.')[1] }}"
+    cluster_name: "{{ cluster_out.stdout.split('registry.')[1] | default(cluster_out.stdout) }}"
 
 - debug:
     msg: "{{ cluster_name }}"
@@ -110,8 +110,6 @@
   shell: "oc process oso-pod-logger -n {{ opl_namespace }} | oc create -n {{ opl_namespace }} -f -"
   run_once: true
   ignore_errors: true
-  retries: 12
-  delay: 5
 
 - name: "Create cluster name env var"
   command: "oc set env -n {{ opl_namespace }} ds/oso-pod-logger CLUSTER_NAME={{ cluster_name }}"
