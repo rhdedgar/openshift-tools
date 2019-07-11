@@ -21,8 +21,8 @@ ENV GOBIN=/bin \
     GOPATH=/go
 
 RUN mkdir -p /host/usr/bin /logs /var/log/journal && \
-    go get github.com/rhdedgar/pod-logger && \
-    cd /go/src/github.com/rhdedgar/pod-logger && \
+    go get github.com/rhdedgar/pleg-watcher && \
+    cd /go/src/github.com/rhdedgar/pleg-watcher && \
     go install && \
     cd && \
     rm -rf /go
