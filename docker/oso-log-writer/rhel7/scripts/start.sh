@@ -14,7 +14,7 @@ fi
 
 echo This container hosts the following applications:
 echo
-echo '/usr/local/bin/log-writer'
+echo '/usr/bin/log-writer'
 echo
 echo '/usr/local/bin/clean.sh'
 
@@ -26,4 +26,4 @@ echo '----------------'
 echo
 echo 'Always listen for pod logs from pod-logger pods.'
 echo '----------------'
-/usr/local/bin/log-writer
+/usr/bin/log-writer
