@@ -23,7 +23,8 @@ ENV GOBIN=/bin \
 RUN mkdir -p /host/usr/bin /logs /var/log/journal && \
     go get github.com/rhdedgar/pleg-watcher && \
     cd /go/src/github.com/rhdedgar/pleg-watcher && \
-    go install && \
+    go install && \ 
+    setcap cap_net_raw,cap_sys_admin,cap_net_admin+ep /usr/bin/pleg-watcher && \
     cd && \
     rm -rf /go
 
