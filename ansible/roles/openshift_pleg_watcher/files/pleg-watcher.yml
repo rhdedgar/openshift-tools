@@ -66,7 +66,7 @@ objects:
           - name: OUTFILE
             value: ""
           - name: CLAMSOCKET 
-            value: "unix:///host/host/var/run/clamd.scan/clamd.sock"
+            value: "unix:///host/var/run/clamd.scan/clamd.sock"
           image: "${NAMESPACE}/oso-${PLAT}-pleg-watcher:latest"
           imagePullPolicy: Always
           name: oso-pleg-watcher 
