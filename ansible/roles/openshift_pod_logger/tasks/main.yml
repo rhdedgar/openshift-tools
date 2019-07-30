@@ -115,9 +115,6 @@
   command: "oc set env -n {{ opl_namespace }} ds/oso-pod-logger CLUSTER_NAME={{ cluster_name }}"
   ignore_errors: true
 
-- pause:
-    minutes: 5
-
 - name: Label nodes
   oc_label:
     selector: "{{ item }}" 
