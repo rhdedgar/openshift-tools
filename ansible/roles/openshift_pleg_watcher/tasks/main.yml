@@ -82,7 +82,7 @@
   register: podlist
 
 - name: "Create bc,is,dc for apps in {{ opleg_namespace }} from template"
-  shell: "oc process oso-pleg-watcher -n {{ opleg_namespace }} | oc create -n {{ opleg_namespace }} -f -"
+  shell: "oc process oso-pleg-watcher -n {{ opleg_namespace }} NAMESPACE={{ registry_ip['stdout'] }} | oc create -n {{ opleg_namespace }} -f -"
   run_once: true
   ignore_errors: true
 
