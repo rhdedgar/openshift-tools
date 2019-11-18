@@ -11,6 +11,19 @@
   command: "oc adm new-project {{ olw_namespace }}"
   ignore_errors: true
 
+- name: create "{{ olw_sa }}" serviceaccount
+  oc_serviceaccount:
+    name: "{{ olw_sa }}"
+    namespace: "{{ olw_namespace }}"
+
+- name: set service account permissions
+  command: "oc adm policy {{ item.r_kind }} {{ item.r_name }} system:serviceaccount:{{ olw_namespace }}:{{ olw_sa }}"
+  run_once: true
+  ignore_errors: true
+  with_items:
+  - r_kind: add-cluster-role-to-user
+    r_name: cluster-reader
+
   # running as command until oc_secret supports config file image secrets
 - name: "Create image pull secret"
   command: "oc secrets new dockercfgjson .dockerconfigjson=/var/lib/origin/.docker/config.json -n {{ olw_namespace }}"
@@ -42,10 +55,10 @@
   run_once: true
   ignore_errors: true
 
-#- name: "Create bc,is,dc for apps in {{ olw_namespace }} from template"
-#  command: "oc process -f {{ tempdir }}/log-writer.yml | oc create -n {{ olw_namespace }} -f -"
-#  run_once: true
-#  ignore_errors: true
+- name: "join with pod-logger project network"
+  command: "oc adm pod-network join-projects --to=openshift-pod-logger {{ olw_namespace }}"
+  run_once: true
+  ignore_errors: true
 
 - name: Delete temp directory
   file:
